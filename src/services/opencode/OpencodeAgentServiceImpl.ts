@@ -652,6 +652,7 @@ export class OpencodeAgentService implements IOpencodeAgentService {
       workspaceService: this.workspaceService,
       webViewService: this.webViewService,
       client: this.client,
+      serverService: this.serverService,
       channels: this.channels,
       modelContextWindowById: this.modelContextWindowById,
       mapPrimaryAgentFromPermissionMode: (mode) => this.mapPrimaryAgentFromPermissionMode(mode),

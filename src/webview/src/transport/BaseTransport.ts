@@ -180,6 +180,19 @@ export abstract class BaseTransport {
     return this.sendRequest({ type: 'get_progress' }, channelId);
   }
 
+  async applyOpencodeConfig(restartServer: boolean = true): Promise<any> {
+    const response = await this.sendRequest({
+      type: 'apply_opencode_config',
+      restartServer
+    });
+
+    if ((response as any)?.config) {
+      this.claudeConfig((response as any).config);
+    }
+
+    return response;
+  }
+
   getSkills(): Promise<any> {
     return this.sendRequest({ type: 'get_skills' });
   }

@@ -26,6 +26,7 @@ export class OpencodeServerService implements IOpencodeServerService {
   private baseUrl?: string;
   private proc?: ChildProcessWithoutNullStreams;
   private startPromise?: Promise<string>;
+  private activeConfigFingerprint?: string;
 
   constructor(
     @ILogService private readonly logService: ILogService,
@@ -41,6 +42,18 @@ export class OpencodeServerService implements IOpencodeServerService {
   }
 
   async ensureServer(): Promise<string> {
+    const currentFingerprint = this.getConfigFingerprint();
+    if (
+      this.baseUrl &&
+      this.activeConfigFingerprint &&
+      this.activeConfigFingerprint !== currentFingerprint
+    ) {
+      this.logService.info(
+        "[OpencodeServerService] Detected OpenCode server setting changes; restarting server binding"
+      );
+      this.dispose();
+    }
+
     if (this.baseUrl) {
       return this.baseUrl;
     }
@@ -82,17 +95,18 @@ export class OpencodeServerService implements IOpencodeServerService {
       this.proc = undefined;
       this.baseUrl = undefined;
       this.startPromise = undefined;
+      this.activeConfigFingerprint = undefined;
     }
   }
 
   private async ensureServerImpl(): Promise<string> {
-    const configuredBaseUrl =
-      this.configService.getValue<string>("opencodeGui.serverBaseUrl", "http://127.0.0.1:4096") ??
-      "http://127.0.0.1:4096";
+    const configuredBaseUrl = this.getConfiguredBaseUrl();
+    const configFingerprint = this.getConfigFingerprint(configuredBaseUrl);
 
     // 1) 如果用户显式配置了非本地地址：只尝试连接，不自动拉起
     if (!this.isLocalBaseUrl(configuredBaseUrl)) {
       this.baseUrl = configuredBaseUrl;
+      this.activeConfigFingerprint = configFingerprint;
       return configuredBaseUrl;
     }
 
@@ -100,6 +114,7 @@ export class OpencodeServerService implements IOpencodeServerService {
     if (await this.checkHealth(configuredBaseUrl)) {
       this.logService.info(`[OpencodeServerService] Using existing server: ${configuredBaseUrl}`);
       this.baseUrl = configuredBaseUrl;
+      this.activeConfigFingerprint = configFingerprint;
       return configuredBaseUrl;
     }
 
@@ -107,7 +122,24 @@ export class OpencodeServerService implements IOpencodeServerService {
     const { url, proc } = await this.startLocalServer(configuredBaseUrl);
     this.proc = proc;
     this.baseUrl = url;
+    this.activeConfigFingerprint = configFingerprint;
     return url;
+  }
+
+  private getConfiguredBaseUrl(): string {
+    return (
+      this.configService.getValue<string>("opencodeGui.serverBaseUrl", "http://127.0.0.1:4096") ??
+      "http://127.0.0.1:4096"
+    );
+  }
+
+  private getConfigFingerprint(configuredBaseUrl?: string): string {
+    const baseUrl = String(configuredBaseUrl ?? this.getConfiguredBaseUrl()).trim();
+    const opencodePath = String(
+      this.configService.getValue<string>("opencodeGui.opencodePath", "opencode") ?? "opencode"
+    ).trim();
+    const configDir = String(this.configService.getValue<string>("opencodeGui.configDir", "") ?? "").trim();
+    return JSON.stringify({ baseUrl, opencodePath, configDir });
   }
 
   private isLocalBaseUrl(baseUrl: string): boolean {

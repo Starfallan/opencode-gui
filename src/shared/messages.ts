@@ -268,6 +268,21 @@ export interface GetProgressResponse {
   };
 }
 
+export interface ApplyOpencodeConfigRequest {
+  type: 'apply_opencode_config';
+  restartServer?: boolean;
+}
+
+export interface ApplyOpencodeConfigResponse {
+  type: 'apply_opencode_config_response';
+  success: boolean;
+  restarted: boolean;
+  managed: boolean;
+  baseUrl?: string;
+  config?: any;
+  error?: string;
+}
+
 /**
  * 获取 MCP 服务器
  */
@@ -934,7 +949,8 @@ export type WebViewRequest =
   | GetSkillsRequest
   | ToggleSkillRequest
   | DeleteSkillRequest
-  | GetProgressRequest;
+  | GetProgressRequest
+  | ApplyOpencodeConfigRequest;
 
 /**
  * Extension → WebView 的所有响应类型
@@ -978,7 +994,8 @@ export type WebViewRequestResponse =
   | GetSkillsResponse
   | ToggleSkillResponse
   | DeleteSkillResponse
-  | GetProgressResponse;
+  | GetProgressResponse
+  | ApplyOpencodeConfigResponse;
 
 /**
  * Extension → WebView 的所有请求类型

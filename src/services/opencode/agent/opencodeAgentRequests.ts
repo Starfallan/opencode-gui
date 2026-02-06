@@ -9,6 +9,7 @@ import type { IConfigurationService } from '../../configurationService';
 import type { IWorkspaceService } from '../../workspaceService';
 import type { IWebViewService } from '../../webViewService';
 import type { IOpencodeClientService } from '../OpencodeClientService';
+import type { IOpencodeServerService } from '../OpencodeServerService';
 
 import type { ChannelState, OpenCodeMessageInfo, OpenCodeToolPart } from './opencodeAgentTypes';
 import { buildToolUseInput } from './opencodeAgentMessageTools';
@@ -50,7 +51,8 @@ import type {
   OpenConfigFileResponse,
   OpenClaudeInTerminalResponse,
   NewConversationTabResponse,
-  RenameTabResponse
+  RenameTabResponse,
+  ApplyOpencodeConfigResponse
 } from '../../../shared/messages';
 
 const OH_MY_HOOKS: Array<{ id: string; description: string }> = [
@@ -88,6 +90,7 @@ export type OpencodeAgentRequestsDeps = {
   workspaceService: IWorkspaceService;
   webViewService: IWebViewService;
   client: IOpencodeClientService;
+  serverService: IOpencodeServerService;
 
   channels: Map<string, ChannelState>;
   modelContextWindowById: Map<string, number>;
@@ -166,6 +169,7 @@ export async function dispatchRequest(
   | SaveOpencodeConfigFileResponse
   | GetOpencodeAuthStatusResponse
   | SetOpencodeAuthApiKeyResponse
+  | ApplyOpencodeConfigResponse
   | any
 > {
   const req: any = (message as any).request;
@@ -177,6 +181,8 @@ export async function dispatchRequest(
       return handleGetClaudeState(deps);
     case 'get_progress':
       return { type: 'get_progress_response', progress: deps.getProgressSnapshot(message.channelId) };
+    case 'apply_opencode_config':
+      return handleApplyOpencodeConfig(deps, req);
     case 'get_claude_config':
       return handleGetClaudeConfig(deps, req.scope, req.configType);
     case 'save_claude_config':
@@ -396,6 +402,56 @@ async function handleGetClaudeState(deps: OpencodeAgentRequestsDeps): Promise<Ge
       slashCommands
     }
   };
+}
+
+async function handleApplyOpencodeConfig(
+  deps: OpencodeAgentRequestsDeps,
+  req: { restartServer?: boolean } | undefined
+): Promise<ApplyOpencodeConfigResponse> {
+  const restartServer = req?.restartServer !== false;
+
+  try {
+    let baseUrl = deps.serverService.getBaseUrl();
+    const wasManaged = deps.serverService.isManaged();
+
+    if (restartServer) {
+      if (wasManaged) {
+        try {
+          await deps.client.disposeAllInstances();
+        } catch (error) {
+          deps.logService.warn(
+            `[OpencodeAgentService] global.dispose failed while applying config (ignored): ${String(error)}`
+          );
+        }
+      }
+
+      deps.serverService.dispose();
+      baseUrl = await deps.serverService.ensureServer();
+    } else if (!baseUrl) {
+      baseUrl = await deps.client.getBaseUrl();
+    }
+
+    const state = await handleGetClaudeState(deps);
+
+    return {
+      type: 'apply_opencode_config_response',
+      success: true,
+      restarted: restartServer,
+      managed: deps.serverService.isManaged(),
+      baseUrl,
+      config: state.config
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    deps.logService.error(`[OpencodeAgentService] apply_opencode_config failed: ${message}`);
+    return {
+      type: 'apply_opencode_config_response',
+      success: false,
+      restarted: false,
+      managed: deps.serverService.isManaged(),
+      error: message
+    };
+  }
 }
 
 function mergeSlashCommands(

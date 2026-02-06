@@ -1,6 +1,5 @@
 <template>
   <div class="settings-page">
-    <!-- 头部 -->
     <div class="settings-header">
       <div class="header-left">
         <button class="back-btn" title="返回" @click="$emit('close')">
@@ -8,11 +7,22 @@
         </button>
         <h2 class="settings-title">设置</h2>
       </div>
+      <div class="header-right">
+        <button class="apply-btn" :disabled="isApplying" @click="applyConfigNow">
+          <span
+            class="codicon"
+            :class="isApplying ? 'codicon-loading codicon-modifier-spin' : 'codicon-sync'"
+          ></span>
+          <span>{{ isApplying ? '生效中...' : '应用并刷新模型' }}</span>
+        </button>
+      </div>
     </div>
 
-    <!-- 内容区域 -->
+    <div v-if="applyMessage" :class="['apply-banner', applyError ? 'is-error' : 'is-ok']">
+      {{ applyMessage }}
+    </div>
+
     <div class="settings-content">
-      <!-- 侧边栏导航 -->
       <nav class="settings-nav">
         <button
           v-for="section in sections"
@@ -26,21 +36,13 @@
         </button>
       </nav>
 
-      <!-- 内容面板 -->
-        <div class="settings-panel">
-          <div class="panel-container">
-            <!-- OpenCode 配置 -->
-            <OpenCodeFilesSettings v-if="currentSection === 'opencodeFiles'" />
-            <OhMySettings v-else-if="currentSection === 'ohMy'" />
- 
-            <!-- MCP服务器 -->
-            <ProvidersSettings v-else-if="currentSection === 'providers'" />
-            <McpServersSettings v-else-if="currentSection === 'mcp'" />
- 
-            <!-- Agents -->
-            <AgentsSettings v-else-if="currentSection === 'agents'" />
- 
-          <!-- Skills -->
+      <div class="settings-panel">
+        <div class="panel-container">
+          <OpenCodeFilesSettings v-if="currentSection === 'opencodeFiles'" />
+          <OhMySettings v-else-if="currentSection === 'ohMy'" />
+          <ProvidersSettings v-else-if="currentSection === 'providers'" />
+          <McpServersSettings v-else-if="currentSection === 'mcp'" />
+          <AgentsSettings v-else-if="currentSection === 'agents'" />
           <SkillsSettings v-else-if="currentSection === 'skills'" />
         </div>
       </div>
@@ -48,14 +50,15 @@
   </div>
 </template>
 
- <script setup lang="ts">
- import { ref } from 'vue'
- import McpServersSettings from '../components/Settings/McpServersSettings.vue'
- import OpenCodeFilesSettings from '../components/Settings/OpenCodeFilesSettings.vue'
- import OhMySettings from '../components/Settings/OhMySettings.vue'
- import ProvidersSettings from '../components/Settings/ProvidersSettings.vue'
- import AgentsSettings from '../components/Settings/AgentsSettings.vue'
- import SkillsSettings from '../components/Settings/SkillsSettings.vue'
+<script setup lang="ts">
+import { inject, onUnmounted, ref } from 'vue'
+import McpServersSettings from '../components/Settings/McpServersSettings.vue'
+import OpenCodeFilesSettings from '../components/Settings/OpenCodeFilesSettings.vue'
+import OhMySettings from '../components/Settings/OhMySettings.vue'
+import ProvidersSettings from '../components/Settings/ProvidersSettings.vue'
+import AgentsSettings from '../components/Settings/AgentsSettings.vue'
+import SkillsSettings from '../components/Settings/SkillsSettings.vue'
+import { RuntimeKey } from '../composables/runtimeContext'
 
 interface SettingsSection {
   id: string
@@ -69,24 +72,78 @@ defineEmits<{
 }>()
 
 const currentSection = ref('opencodeFiles')
+const runtime = inject(RuntimeKey)
+if (!runtime) {
+  throw new Error('[SettingsPage] Runtime not provided')
+}
 
- const sections: SettingsSection[] = [
-   {
-     id: 'opencodeFiles',
-     label: 'OpenCode 配置',
-     icon: 'json'
-   },
-   {
-     id: 'ohMy',
-     label: 'oh-my-opencode',
-     icon: 'settings-gear'
-   },
-   {
-     id: 'providers',
-     label: 'Providers',
-     icon: 'cloud'
-   },
-  { id: 'mcp', label: 'MCP服务器', icon: 'server', needsRestart: true },
+const isApplying = ref(false)
+const applyMessage = ref('')
+const applyError = ref(false)
+let applyMessageTimer: ReturnType<typeof setTimeout> | undefined
+
+function scheduleClearApplyMessage() {
+  if (applyMessageTimer) clearTimeout(applyMessageTimer)
+  applyMessageTimer = setTimeout(() => {
+    applyMessage.value = ''
+  }, 5000)
+}
+
+async function applyConfigNow(): Promise<void> {
+  if (isApplying.value) return
+
+  isApplying.value = true
+  applyError.value = false
+  applyMessage.value = ''
+
+  try {
+    const connection = await runtime!.connectionManager.get()
+    const resp = await connection.applyOpencodeConfig(true)
+    if (resp?.type !== 'apply_opencode_config_response') {
+      throw new Error(`Unexpected response: ${String(resp?.type ?? resp)}`)
+    }
+    if (!resp.success) {
+      throw new Error(String(resp.error ?? '应用失败'))
+    }
+
+    const url = typeof resp.baseUrl === 'string' && resp.baseUrl ? ` (${resp.baseUrl})` : ''
+    applyMessage.value = `配置已生效${url}`
+    scheduleClearApplyMessage()
+  } catch (error) {
+    applyError.value = true
+    applyMessage.value = error instanceof Error ? error.message : String(error)
+    scheduleClearApplyMessage()
+  } finally {
+    isApplying.value = false
+  }
+}
+
+onUnmounted(() => {
+  if (applyMessageTimer) clearTimeout(applyMessageTimer)
+})
+
+const sections: SettingsSection[] = [
+  {
+    id: 'opencodeFiles',
+    label: 'OpenCode 配置',
+    icon: 'json'
+  },
+  {
+    id: 'ohMy',
+    label: 'oh-my-opencode',
+    icon: 'settings-gear'
+  },
+  {
+    id: 'providers',
+    label: 'Providers',
+    icon: 'cloud'
+  },
+  {
+    id: 'mcp',
+    label: 'MCP服务器',
+    icon: 'server',
+    needsRestart: true
+  },
   {
     id: 'agents',
     label: 'Agents',
@@ -109,7 +166,6 @@ const currentSection = ref('opencodeFiles')
   color: var(--vscode-editor-foreground);
 }
 
-/* 头部 */
 .settings-header {
   display: flex;
   align-items: center;
@@ -124,6 +180,12 @@ const currentSection = ref('opencodeFiles')
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .back-btn {
@@ -150,14 +212,53 @@ const currentSection = ref('opencodeFiles')
   font-weight: 600;
 }
 
-/* 内容区域 */
+.apply-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.apply-btn:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.apply-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.apply-banner {
+  margin: 8px 16px 0 16px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--vscode-panel-border);
+  font-size: 12px;
+}
+
+.apply-banner.is-ok {
+  color: var(--vscode-testing-iconPassed, #73c991);
+  background: color-mix(in srgb, var(--vscode-testing-iconPassed, #73c991) 12%, transparent);
+}
+
+.apply-banner.is-error {
+  color: var(--vscode-errorForeground);
+  background: color-mix(in srgb, var(--vscode-errorForeground) 10%, transparent);
+}
+
 .settings-content {
   display: flex;
   flex: 1;
   overflow: hidden;
 }
 
-/* 侧边栏导航 */
 .settings-nav {
   width: 200px;
   padding: 12px 8px;
@@ -210,7 +311,6 @@ const currentSection = ref('opencodeFiles')
   font-weight: bold;
 }
 
-/* 内容面板 */
 .settings-panel {
   flex: 1;
   overflow-y: auto;
