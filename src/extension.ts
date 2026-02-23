@@ -94,6 +94,31 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
 
+      // 处理保存 session ID 请求
+      if (message.type === 'request' && message.request?.type === 'save-active-session') {
+        const sessionId = message.request.sessionId as string;
+        await context.workspaceState.update('opencodeGui.activeSessionId', sessionId);
+        logService.info(`[Extension] Saved active session ID: ${sessionId}`);
+        webViewService.postMessage({
+          type: 'response',
+          requestId: message.requestId,
+          response: { type: 'save-active-session_response', success: true }
+        });
+        return;
+      }
+
+      // 处理获取保存的 session ID 请求
+      if (message.type === 'request' && message.request?.type === 'get-saved-session') {
+        const savedSessionId = context.workspaceState.get<string>('opencodeGui.activeSessionId');
+        logService.info(`[Extension] Retrieved saved session ID: ${savedSessionId}`);
+        webViewService.postMessage({
+          type: 'response',
+          requestId: message.requestId,
+          response: { type: 'get-saved-session_response', sessionId: savedSessionId }
+        });
+        return;
+      }
+
       // 其他消息交给 OpenCode Agent Service 处理
       opencodeAgentService.fromClient(message);
     });

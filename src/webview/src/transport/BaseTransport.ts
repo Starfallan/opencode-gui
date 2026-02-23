@@ -275,6 +275,22 @@ export abstract class BaseTransport {
   getSession(sessionId: string): Promise<any> {
     return this.sendRequest({ type: 'get_session_request', sessionId });
   }
+
+  // 保存当前活跃的 session ID 到 workspaceState
+  async saveActiveSession(sessionId: string): Promise<{ success: boolean }> {
+    const response = await this.sendRequest<{ success: boolean }>({
+      type: 'save-active-session',
+      sessionId
+    });
+    return response ?? { success: false };
+  }
+
+  // 获取保存的 session ID
+  async getSavedSession(): Promise<{ sessionId?: string }> {
+    const response = await this.sendRequest<{ sessionId?: string }>({ type: 'get-saved-session' });
+    return response ?? {};
+  }
+
   listFiles(pattern?: string): Promise<any> {
     return this.sendRequest({ type: 'list_files_request', pattern });
   }

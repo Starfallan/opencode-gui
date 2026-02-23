@@ -354,6 +354,31 @@ export interface GetSessionResponse {
 }
 
 /**
+ * 保存当前活跃的 session ID
+ */
+export interface SaveActiveSessionRequest {
+  type: 'save-active-session';
+  sessionId: string;
+}
+
+export interface SaveActiveSessionResponse {
+  type: 'save-active-session_response';
+  success: boolean;
+}
+
+/**
+ * 获取保存的 session ID
+ */
+export interface GetSavedSessionRequest {
+  type: 'get-saved-session';
+}
+
+export interface GetSavedSessionResponse {
+  type: 'get-saved-session_response';
+  sessionId?: string;
+}
+
+/**
  * 执行命令
  */
 export interface ExecRequest {
@@ -929,6 +954,8 @@ export type WebViewRequest =
   | ListSessionsRequest
   | DeleteSessionRequest
   | GetSessionRequest
+  | SaveActiveSessionRequest
+  | GetSavedSessionRequest
   | ExecRequest
   | ListFilesRequest
   | OpenURLRequest
@@ -974,6 +1001,8 @@ export type WebViewRequestResponse =
   | ListSessionsResponse
   | DeleteSessionResponse
   | GetSessionResponse
+  | SaveActiveSessionResponse
+  | GetSavedSessionResponse
   | ExecResponse
   | ListFilesResponse
   | OpenURLResponse

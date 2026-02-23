@@ -20,7 +20,9 @@ export function useRuntime(): RuntimeInstance {
   const atMentionEvents = new EventEmitter<string>();
   const selectionEvents = new EventEmitter<any>();
 
-  const connectionManager = new ConnectionManager(() => new VSCodeTransport(atMentionEvents, selectionEvents));
+  const connectionManager = new ConnectionManager(
+    () => new VSCodeTransport(atMentionEvents, selectionEvents)
+  );
   const appContext = new AppContext(connectionManager);
 
   // 创建 alien-signal 用于 SessionContext
@@ -64,7 +66,7 @@ export function useRuntime(): RuntimeInstance {
     const claudeConfig = connection?.claudeConfig();
 
     // 清理旧的 Slash Commands
-    slashCommandDisposers.forEach(dispose => dispose());
+    slashCommandDisposers.forEach((dispose) => dispose());
     slashCommandDisposers = [];
 
     // 初始化模型列表（从后端获取）
@@ -105,31 +107,88 @@ export function useRuntime(): RuntimeInstance {
 
     (async () => {
       const connection = await connectionManager.get();
-      try { await connection.opened; } catch (e) { console.error('[runtime] open failed', e); return; }
+      try {
+        await connection.opened;
+      } catch (e) {
+        console.error('[runtime] open failed', e);
+        return;
+      }
 
       if (disposed) return;
 
       try {
         const selection = await connection.getCurrentSelection();
         if (!disposed) appContext.currentSelection(selection?.selection ?? undefined);
-      } catch (e) { console.warn('[runtime] selection fetch failed', e); }
+      } catch (e) {
+        console.warn('[runtime] selection fetch failed', e);
+      }
 
       try {
         const assets = await connection.getAssetUris();
         if (!disposed) appContext.assetUris(assets.assetUris);
-      } catch (e) { console.warn('[runtime] assets fetch failed', e); }
+      } catch (e) {
+        console.warn('[runtime] assets fetch failed', e);
+      }
 
+      // 获取所有会话列表
       await sessionStore.listSessions();
+
+      // 尝试恢复保存的 session
       if (!disposed && !sessionStore.activeSession()) {
+        try {
+          const savedSession = await connection.getSavedSession();
+          const savedSessionId = savedSession?.sessionId;
+
+          if (savedSessionId) {
+            console.log('[runtime] Found saved session ID:', savedSessionId);
+            // 尝试打开保存的 session
+            const sessions = sessionStore.sessions();
+            const existingSession = sessions.find((s) => s.sessionId() === savedSessionId);
+
+            if (existingSession) {
+              console.log('[runtime] Restoring existing session:', savedSessionId);
+              sessionStore.setActiveSession(existingSession);
+            } else {
+              // session 不存在，尝试通过 ID 打开
+              console.log('[runtime] Opening session by ID:', savedSessionId);
+              await sessionStore.openSessionById(savedSessionId);
+            }
+          }
+        } catch (e) {
+          console.warn('[runtime] Failed to restore session:', e);
+        }
+      }
+
+      // 如果仍然没有活跃 session，创建一个新的
+      if (!disposed && !sessionStore.activeSession()) {
+        console.log('[runtime] Creating new session');
         await sessionStore.createSession({ isExplicit: false });
       }
+
+      // 监听 activeSession 变化，保存 session ID
+      const cleanupSessionWatch = effect(() => {
+        const activeSession = sessionStore.activeSession();
+        const sessionId = activeSession?.sessionId();
+        if (sessionId) {
+          // 保存到 workspaceState
+          connection.saveActiveSession(sessionId).catch((e) => {
+            console.warn('[runtime] Failed to save session ID:', e);
+          });
+        }
+      });
+
+      // 保存 cleanup 函数
+      const originalOnUnmounted = onUnmounted;
+      originalOnUnmounted(() => {
+        cleanupSessionWatch();
+      });
     })();
 
     onUnmounted(() => {
       disposed = true;
 
       // 清理命令注册
-      slashCommandDisposers.forEach(dispose => dispose());
+      slashCommandDisposers.forEach((dispose) => dispose());
       cleanupSlashCommands();
 
       connectionManager.close();
@@ -138,4 +197,3 @@ export function useRuntime(): RuntimeInstance {
 
   return { connectionManager, appContext, sessionStore, atMentionEvents, selectionEvents };
 }
-
