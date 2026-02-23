@@ -12,22 +12,19 @@
             key="sessions"
             @switch-to-chat="handleSwitchToChat"
           />
-          <ChatPage
-            v-else-if="currentPage === 'chat'"
-            key="chat"
-            @switch-to-sessions="switchToPage('sessions')"
-            @switch-to-settings="switchToPage('settings')"
-          />
-          <SettingsPage
-            v-else-if="currentPage === 'settings'"
-            key="settings"
-            @close="switchToPage('chat')"
-          />
-          <!-- IconTestPage -->
-          <!-- <IconTestPage
-            v-else-if="currentPage === 'icontest'"
-            key="icontest"
-          /> -->
+          <template v-else>
+            <ChatPage
+              v-show="currentPage === 'chat'"
+              key="chat"
+              @switch-to-sessions="switchToPage('sessions')"
+              @switch-to-settings="switchToPage('settings')"
+            />
+            <SettingsPage
+              v-show="currentPage === 'settings'"
+              key="settings"
+              @close="switchToPage('chat')"
+            />
+          </template>
         </Motion>
       </div>
     </main>
