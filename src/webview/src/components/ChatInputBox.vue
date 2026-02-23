@@ -80,6 +80,7 @@
       :has-input-content="hasPayload"
       :show-progress="showProgress"
       :progress-percentage="progressPercentage"
+      :hide-model-controls="hideModelControls"
       @submit="handleSubmit"
       @stop="handleStop"
       @add-attachment="handleAddFiles"
@@ -193,6 +194,7 @@ interface Props {
   selectedVariant?: string;
   conversationWorking?: boolean;
   attachments?: AttachmentItem[];
+  hideModelControls?: boolean;
   messageQueue?: Array<{
     id: string;
     input: string;
@@ -229,6 +231,7 @@ const props = withDefaults(defineProps<Props>(), {
   selectedVariant: undefined,
   conversationWorking: false,
   attachments: () => [],
+  hideModelControls: false,
   messageQueue: () => []
 });
 

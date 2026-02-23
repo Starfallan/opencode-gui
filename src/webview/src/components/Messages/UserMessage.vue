@@ -1,11 +1,7 @@
 <template>
   <div class="user-message">
     <div class="message-wrapper">
-      <div
-        ref="containerRef"
-        class="message-content"
-        :class="{ editing: isEditing }"
-      >
+      <div ref="containerRef" class="message-content" :class="{ editing: isEditing }">
         <!-- 普通显示模式 -->
         <div
           v-if="!isEditing"
@@ -18,11 +14,7 @@
         >
           <div class="message-text">
             <div>{{ displayContent }}</div>
-            <button
-              class="restore-button"
-              @click.stop="handleRestore"
-              title="Restore checkpoint"
-            >
+            <button class="restore-button" @click.stop="handleRestore" title="Restore checkpoint">
               <span class="codicon codicon-restore"></span>
             </button>
           </div>
@@ -34,6 +26,7 @@
             :show-progress="false"
             :conversation-working="false"
             :attachments="attachments"
+            :hide-model-controls="true"
             ref="chatInputRef"
             @submit="handleSaveEdit"
             @stop="cancelEdit"
@@ -75,7 +68,7 @@ const displayContent = computed(() => {
   // 如果是 content blocks，提取文本
   if (Array.isArray(props.message.message.content)) {
     return props.message.message.content
-      .map(wrapper => {
+      .map((wrapper) => {
         const block = wrapper.content;
         if (block.type === 'text') {
           return block.text;
@@ -110,7 +103,7 @@ function extractAttachments(): AttachmentItem[] {
         fileName: `image.${ext}`,
         mediaType: block.source.media_type || 'image/png',
         data: block.source.data,
-        fileSize: 0, // 历史消息无法获取原始大小
+        fileSize: 0 // 历史消息无法获取原始大小
       });
     } else if (block.type === 'document' && block.source) {
       const title = block.title || 'document';
@@ -119,7 +112,7 @@ function extractAttachments(): AttachmentItem[] {
         fileName: title,
         mediaType: block.source.media_type || 'application/octet-stream',
         data: block.source.data,
-        fileSize: 0,
+        fileSize: 0
       });
     }
   }
@@ -142,7 +135,7 @@ async function startEditing() {
 }
 
 function handleRemoveAttachment(id: string) {
-  attachments.value = attachments.value.filter(a => a.id !== id);
+  attachments.value = attachments.value.filter((a) => a.id !== id);
 }
 
 function cancelEdit() {
@@ -268,11 +261,7 @@ onUnmounted(() => {
   align-items: flex-start;
   gap: 8px;
   width: 100%;
-  background-color: color-mix(
-    in srgb,
-    var(--vscode-sideBar-background) 60%,
-    transparent
-  );
+  background-color: color-mix(in srgb, var(--vscode-sideBar-background) 60%, transparent);
   outline: none;
   border: 1px solid var(--vscode-editorWidget-border);
   border-radius: 6px;
@@ -298,11 +287,7 @@ onUnmounted(() => {
 
 .message-view .message-text {
   cursor: pointer;
-  background-color: color-mix(
-    in srgb,
-    var(--vscode-input-background) 60%,
-    transparent
-  );
+  background-color: color-mix(in srgb, var(--vscode-input-background) 60%, transparent);
   outline: none;
   border-radius: 6px;
   width: 100%;
@@ -317,11 +302,7 @@ onUnmounted(() => {
 }
 
 .message-view .message-text:hover {
-  background-color: color-mix(
-    in srgb,
-    var(--vscode-input-background) 70%,
-    transparent
-  );
+  background-color: color-mix(in srgb, var(--vscode-input-background) 70%, transparent);
 }
 
 .message-text > div:first-child {
@@ -389,7 +370,6 @@ onUnmounted(() => {
 }
 
 .edit-mode :deep(.full-input-box:focus-within) {
-  box-shadow: 0 0 8px 2px
-    color-mix(in srgb, var(--vscode-input-background) 30%, transparent);
+  box-shadow: 0 0 8px 2px color-mix(in srgb, var(--vscode-input-background) 30%, transparent);
 }
 </style>

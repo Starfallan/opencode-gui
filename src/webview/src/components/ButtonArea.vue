@@ -2,7 +2,7 @@
   <div class="button-area-container">
     <div class="button-row">
       <!-- Left Section: Dropdowns -->
-      <div class="controls-section">
+      <div v-if="!hideModelControls" class="controls-section">
         <!-- Mode Select -->
         <ModeSelect
           :primary-agent-mode="primaryAgentMode"
@@ -79,12 +79,16 @@
       </div>
 
       <!-- Right Section: Token Indicator + Action Buttons -->
-      <div class="actions-section">
+      <div class="actions-section" :class="{ 'full-width': hideModelControls }">
         <!-- Token Indicator -->
-        <TokenIndicator v-if="showProgress" :percentage="progressPercentage" />
+        <TokenIndicator
+          v-if="showProgress && !hideModelControls"
+          :percentage="progressPercentage"
+        />
 
         <!-- Progress Button -->
         <button
+          v-if="!hideModelControls"
           class="action-button"
           @click="() => emit('open-progress')"
           aria-label="Session Progress"
@@ -197,6 +201,7 @@ interface Props {
   hasInputContent?: boolean;
   showProgress?: boolean;
   progressPercentage?: number;
+  hideModelControls?: boolean;
 }
 
 interface Emits {
@@ -218,7 +223,8 @@ const props = withDefaults(defineProps<Props>(), {
   conversationWorking: false,
   hasInputContent: false,
   showProgress: true,
-  progressPercentage: 0
+  progressPercentage: 0,
+  hideModelControls: false
 });
 
 const emit = defineEmits<Emits>();
@@ -370,6 +376,10 @@ function handleCommandKeydown(event: KeyboardEvent) {
   align-items: center;
   gap: 4px;
   justify-content: flex-end;
+}
+
+.actions-section.full-width {
+  flex: 1;
 }
 
 .action-button,
