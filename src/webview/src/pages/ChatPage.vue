@@ -10,7 +10,9 @@
       </div>
       <div class="header-right">
         <div v-if="sessionNavVisible" class="session-nav" :title="sessionNavTitle">
-          <span v-if="sessionNavIndicator" class="session-nav-indicator">{{ sessionNavIndicator }}</span>
+          <span v-if="sessionNavIndicator" class="session-nav-indicator">{{
+            sessionNavIndicator
+          }}</span>
           <button
             v-if="canGoParentSession"
             class="session-nav-btn"
@@ -151,7 +153,7 @@
 </template>
 
 <script setup lang="ts">
- import { ref, computed, inject, onMounted, onUnmounted, nextTick, watch } from 'vue';
+import { ref, computed, inject, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { RuntimeKey } from '../composables/runtimeContext';
 import { useSession } from '../composables/useSession';
 import { useModelManagement } from '../composables/useModelManagement';
@@ -164,11 +166,11 @@ import ChatInputBox from '../components/ChatInputBox.vue';
 import Spinner from '../components/Messages/WaitingIndicator.vue';
 import RandomTip from '../components/RandomTip.vue';
 import MessageRenderer from '../components/Messages/MessageRenderer.vue';
- import PermissionRequestModal from '../components/PermissionRequestModal.vue';
- import ProgressDialog from '../components/ProgressDialog.vue';
- import ModelManagementDialog from '../components/ModelManagementDialog.vue';
- import { useKeybinding } from '../utils/useKeybinding';
- import { useSignal } from '@gn8/alien-signals-vue';
+import PermissionRequestModal from '../components/PermissionRequestModal.vue';
+import ProgressDialog from '../components/ProgressDialog.vue';
+import ModelManagementDialog from '../components/ModelManagementDialog.vue';
+import { useKeybinding } from '../utils/useKeybinding';
+import { useSignal } from '@gn8/alien-signals-vue';
 
 const runtime = (() => {
   const rt = inject(RuntimeKey);
@@ -435,6 +437,10 @@ const attachments = ref<AttachmentItem[]>([]);
 // 记录上次消息数量，用于判断是否需要滚动
 let prevCount = 0;
 
+// 自动滚动跟随状态
+const autoScrollEnabled = ref(true);
+const SCROLL_THRESHOLD = 50;
+
 function stringify(m: any): string {
   try {
     return JSON.stringify(m ?? {}, null, 2);
@@ -444,6 +450,7 @@ function stringify(m: any): string {
 }
 
 function scrollToBottom(): void {
+  if (!autoScrollEnabled.value) return;
   const end = endEl.value;
   if (!end) return;
   requestAnimationFrame(() => {
@@ -451,6 +458,20 @@ function scrollToBottom(): void {
       end.scrollIntoView({ block: 'end' });
     } catch {}
   });
+}
+
+function handleScroll(): void {
+  const container = containerEl.value;
+  if (!container) return;
+
+  const { scrollTop, scrollHeight, clientHeight } = container;
+  const isAtBottom = scrollHeight - scrollTop - clientHeight < SCROLL_THRESHOLD;
+
+  if (isAtBottom) {
+    autoScrollEnabled.value = true;
+  } else {
+    autoScrollEnabled.value = false;
+  }
 }
 
 // moved above
@@ -501,11 +522,21 @@ onMounted(async () => {
   prevCount = messages.value.length;
   await nextTick();
   scrollToBottom();
+
+  const container = containerEl.value;
+  if (container) {
+    container.addEventListener('scroll', handleScroll, { passive: true });
+  }
 });
 
 onUnmounted(() => {
   disposeLocalModelCommand?.();
   disposeLocalModelsCommand?.();
+
+  const container = containerEl.value;
+  if (container) {
+    container.removeEventListener('scroll', handleScroll);
+  }
 });
 
 async function createNew(): Promise<void> {
@@ -533,6 +564,9 @@ async function handleSubmit(content: string) {
   const trimmed = (content || '').trim();
   if (!s || (!trimmed && attachments.value.length === 0)) return;
 
+  // 用户发送消息时，恢复自动滚动
+  autoScrollEnabled.value = true;
+
   // OpenCode 的 /model 是 UI 侧命令（打开模型选择），不应发送到后端 session command
   if (trimmed.startsWith('/')) {
     const cmd = trimmed.slice(1).trimStart().split(/\s+/)[0]?.toLowerCase();
@@ -545,7 +579,9 @@ async function handleSubmit(content: string) {
   const isImmediateSlashCommand = (text: string) => {
     if (!text.startsWith('/')) return false;
     const cmd = text.slice(1).trimStart().split(/\s+/)[0]?.toLowerCase();
-    return cmd === 'undo' || cmd === 'redo' || cmd === 'init' || cmd === 'compact' || cmd === 'summarize';
+    return (
+      cmd === 'undo' || cmd === 'redo' || cmd === 'init' || cmd === 'compact' || cmd === 'summarize'
+    );
   };
 
   // 如果AI正在回复，将消息加入队列
