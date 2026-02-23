@@ -291,6 +291,36 @@ export abstract class BaseTransport {
     return response ?? {};
   }
 
+  // 保存选中的 agent 到 workspaceState
+  async saveSelectedAgent(agentName: string): Promise<{ success: boolean }> {
+    const response = await this.sendRequest<{ success: boolean }>({
+      type: 'save-selected-agent',
+      agentName
+    });
+    return response ?? { success: false };
+  }
+
+  // 获取保存的 agent
+  async getSavedAgent(): Promise<{ agentName?: string }> {
+    const response = await this.sendRequest<{ agentName?: string }>({ type: 'get-saved-agent' });
+    return response ?? {};
+  }
+
+  // 保存选中的 model 到 workspaceState
+  async saveSelectedModel(modelId: string): Promise<{ success: boolean }> {
+    const response = await this.sendRequest<{ success: boolean }>({
+      type: 'save-selected-model',
+      modelId
+    });
+    return response ?? { success: false };
+  }
+
+  // 获取保存的 model
+  async getSavedModel(): Promise<{ modelId?: string }> {
+    const response = await this.sendRequest<{ modelId?: string }>({ type: 'get-saved-model' });
+    return response ?? {};
+  }
+
   listFiles(pattern?: string): Promise<any> {
     return this.sendRequest({ type: 'list_files_request', pattern });
   }

@@ -6,6 +6,7 @@ import { VSCodeTransport } from '../transport/VSCodeTransport';
 import { AppContext } from '../core/AppContext';
 import { SessionStore } from '../core/SessionStore';
 import { useModelManagement } from './useModelManagement';
+import { useAgentManagement } from './useAgentManagement';
 import type { SelectionRange } from '../core/Session';
 
 export interface RuntimeInstance {
@@ -59,7 +60,34 @@ export function useRuntime(): RuntimeInstance {
   let slashCommandDisposers: Array<() => void> = [];
 
   // 初始化模型管理
-  const { initFromBackend } = useModelManagement();
+  const { initFromBackend: initModelsFromBackend } = useModelManagement();
+  const { initFromBackend: initAgentsFromBackend } = useAgentManagement();
+
+  // 初始化 agents 列表（从后端 /agent 接口获取）
+  const initAgents = async () => {
+    const conn = connectionManager.connection();
+    if (!conn) return;
+
+    try {
+      const response = await conn.getAgents();
+      if (response?.agents && Array.isArray(response.agents)) {
+        const agentInfos = response.agents.map((a: any) => ({
+          name: a.name,
+          description: a.description,
+          mode:
+            a.category?.toLowerCase() === 'primary' || a.category?.toLowerCase() === 'all'
+              ? 'primary'
+              : 'subagent',
+          model: a.model ? { providerID: '', modelID: a.model } : undefined,
+          hidden: a.hidden === true
+        }));
+        initAgentsFromBackend(agentInfos);
+        console.log('[Runtime] Initialized agents:', agentInfos.length);
+      }
+    } catch (e) {
+      console.warn('[Runtime] Failed to get agents:', e);
+    }
+  };
 
   const cleanupSlashCommands = effect(() => {
     const connection = connectionManager.connection();
@@ -71,7 +99,7 @@ export function useRuntime(): RuntimeInstance {
 
     // 初始化模型列表（从后端获取）
     if (claudeConfig?.models && Array.isArray(claudeConfig.models)) {
-      initFromBackend(claudeConfig.models);
+      initModelsFromBackend(claudeConfig.models);
     }
 
     // 注册新的 Slash Commands
@@ -115,6 +143,9 @@ export function useRuntime(): RuntimeInstance {
       }
 
       if (disposed) return;
+
+      // 初始化 agents 列表
+      initAgents();
 
       try {
         const selection = await connection.getCurrentSelection();

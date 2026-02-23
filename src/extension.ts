@@ -119,6 +119,56 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
 
+      // 处理保存选中的 agent 请求
+      if (message.type === 'request' && message.request?.type === 'save-selected-agent') {
+        const agentName = message.request.agentName as string;
+        await context.workspaceState.update('opencodeGui.selectedAgent', agentName);
+        logService.info(`[Extension] Saved selected agent: ${agentName}`);
+        webViewService.postMessage({
+          type: 'response',
+          requestId: message.requestId,
+          response: { type: 'save-selected-agent_response', success: true }
+        });
+        return;
+      }
+
+      // 处理获取保存的 agent 请求
+      if (message.type === 'request' && message.request?.type === 'get-saved-agent') {
+        const savedAgent = context.workspaceState.get<string>('opencodeGui.selectedAgent');
+        logService.info(`[Extension] Retrieved saved agent: ${savedAgent}`);
+        webViewService.postMessage({
+          type: 'response',
+          requestId: message.requestId,
+          response: { type: 'get-saved-agent_response', agentName: savedAgent }
+        });
+        return;
+      }
+
+      // 处理保存选中的 model 请求
+      if (message.type === 'request' && message.request?.type === 'save-selected-model') {
+        const modelId = message.request.modelId as string;
+        await context.workspaceState.update('opencodeGui.selectedModel', modelId);
+        logService.info(`[Extension] Saved selected model: ${modelId}`);
+        webViewService.postMessage({
+          type: 'response',
+          requestId: message.requestId,
+          response: { type: 'save-selected-model_response', success: true }
+        });
+        return;
+      }
+
+      // 处理获取保存的 model 请求
+      if (message.type === 'request' && message.request?.type === 'get-saved-model') {
+        const savedModel = context.workspaceState.get<string>('opencodeGui.selectedModel');
+        logService.info(`[Extension] Retrieved saved model: ${savedModel}`);
+        webViewService.postMessage({
+          type: 'response',
+          requestId: message.requestId,
+          response: { type: 'get-saved-model_response', modelId: savedModel }
+        });
+        return;
+      }
+
       // 其他消息交给 OpenCode Agent Service 处理
       opencodeAgentService.fromClient(message);
     });

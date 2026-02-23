@@ -84,7 +84,7 @@
       @stop="handleStop"
       @add-attachment="handleAddFiles"
       @mention="handleMention"
-      @primary-agent-select="(mode) => emit('primary-agent-select', mode)"
+      @primary-agent-select="(mode, modelValue) => emit('primary-agent-select', mode, modelValue)"
       @model-select="(modelId) => emit('model-select', modelId)"
       @variant-select="(variant) => emit('variant-select', variant)"
       @open-progress="() => emit('open-progress')"
@@ -209,7 +209,7 @@ interface Emits {
   (e: 'attach'): void;
   (e: 'add-attachment', files: FileList): void;
   (e: 'remove-attachment', id: string): void;
-  (e: 'primary-agent-select', mode: 'build' | 'plan'): void;
+  (e: 'primary-agent-select', mode: string, modelValue?: string): void;
   (e: 'model-select', modelId: string): void;
   (e: 'variant-select', variant: string): void;
   (e: 'open-progress'): void;

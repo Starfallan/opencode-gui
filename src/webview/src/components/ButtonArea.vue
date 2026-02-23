@@ -6,7 +6,9 @@
         <!-- Mode Select -->
         <ModeSelect
           :primary-agent-mode="primaryAgentMode"
-          @primary-agent-select="(mode) => emit('primary-agent-select', mode)"
+          @primary-agent-select="
+            (mode, modelValue) => emit('primary-agent-select', mode, modelValue)
+          "
         />
 
         <!-- Model Select -->
@@ -187,7 +189,7 @@ import { getSlashCommands, commandToDropdownItem } from '../providers/slashComma
 interface Props {
   disabled?: boolean;
   loading?: boolean;
-  primaryAgentMode?: 'build' | 'plan';
+  primaryAgentMode?: string;
   selectedModel?: string;
   availableVariants?: string[];
   selectedVariant?: string;
@@ -202,7 +204,7 @@ interface Emits {
   (e: 'stop'): void;
   (e: 'attach'): void;
   (e: 'add-attachment', files: FileList): void;
-  (e: 'primary-agent-select', mode: 'build' | 'plan'): void;
+  (e: 'primary-agent-select', mode: string, modelValue?: string): void;
   (e: 'model-select', modelId: string): void;
   (e: 'variant-select', variant: string): void;
   (e: 'open-progress'): void;

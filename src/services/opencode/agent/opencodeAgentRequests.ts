@@ -180,7 +180,10 @@ export async function dispatchRequest(
     case 'get_claude_state':
       return handleGetClaudeState(deps);
     case 'get_progress':
-      return { type: 'get_progress_response', progress: deps.getProgressSnapshot(message.channelId) };
+      return {
+        type: 'get_progress_response',
+        progress: deps.getProgressSnapshot(message.channelId)
+      };
     case 'apply_opencode_config':
       return handleApplyOpencodeConfig(deps, req);
     case 'get_claude_config':
@@ -220,7 +223,10 @@ export async function dispatchRequest(
         }
       }
 
-      await deps.configService.updateValue('opencodeGui.selectedModel', String(req.model?.value ?? ''));
+      await deps.configService.updateValue(
+        'opencodeGui.selectedModel',
+        String(req.model?.value ?? '')
+      );
       return { type: 'set_model_response', success: true };
     }
 
@@ -241,7 +247,8 @@ export async function dispatchRequest(
       if (typeof message.channelId === 'string') {
         const state = deps.channels.get(message.channelId);
         if (state) {
-          state.permissionMode = typeof req.mode === 'string' ? req.mode.trim() || undefined : undefined;
+          state.permissionMode =
+            typeof req.mode === 'string' ? req.mode.trim() || undefined : undefined;
           state.activeAgent = deps.mapPrimaryAgentFromPermissionMode(state.permissionMode);
         }
       }
@@ -273,7 +280,11 @@ export async function dispatchRequest(
       return handleShowNotification(req as ShowNotificationRequest);
 
     case 'exec':
-      return handleExec(deps, String(req.command ?? ''), Array.isArray(req.params) ? req.params : []);
+      return handleExec(
+        deps,
+        String(req.command ?? ''),
+        Array.isArray(req.params) ? req.params : []
+      );
 
     case 'new_conversation_tab':
       return handleNewConversationTab(deps);
@@ -329,7 +340,9 @@ function handleInit(deps: OpencodeAgentRequestsDeps): InitResponse {
   };
 }
 
-async function handleGetClaudeState(deps: OpencodeAgentRequestsDeps): Promise<GetClaudeStateResponse> {
+async function handleGetClaudeState(
+  deps: OpencodeAgentRequestsDeps
+): Promise<GetClaudeStateResponse> {
   const cwd = deps.workspaceService.getDefaultWorkspaceFolder()?.uri.fsPath ?? process.cwd();
   let models: Array<{
     value: string;
@@ -371,7 +384,11 @@ async function handleGetClaudeState(deps: OpencodeAgentRequestsDeps): Promise<Ge
   let slashCommands: Array<{ name: string; description?: string }> = [];
   try {
     const raw = await deps.client.listCommands(cwd);
-    const items: any[] = Array.isArray(raw) ? raw : Array.isArray(raw?.commands) ? raw.commands : [];
+    const items: any[] = Array.isArray(raw)
+      ? raw
+      : Array.isArray(raw?.commands)
+        ? raw.commands
+        : [];
     const seen = new Set<string>();
     const out: Array<{ name: string; description?: string }> = [];
     for (const c of items) {
@@ -472,9 +489,7 @@ function mergeSlashCommands(
   return Array.from(map.values());
 }
 
-function mapProvidersToModels(
-  providers: any[]
-): Array<{
+function mapProvidersToModels(providers: any[]): Array<{
   value: string;
   displayName?: string;
   description?: string;
@@ -536,7 +551,8 @@ function mapProvidersToModels(
           : [];
 
     for (const m of modelsRaw) {
-      const modelID = typeof m === 'string' ? m : String(m?.id ?? m?.modelID ?? m?.name ?? '').trim();
+      const modelID =
+        typeof m === 'string' ? m : String(m?.id ?? m?.modelID ?? m?.name ?? '').trim();
       if (!modelID) continue;
 
       const displayName =
@@ -544,7 +560,8 @@ function mapProvidersToModels(
           ? `${providerName}/${modelID}`
           : String(m?.displayName ?? m?.name ?? `${providerName}/${modelID}`);
 
-      const description = typeof m === 'string' ? providerDesc : String(m?.description ?? providerDesc ?? '');
+      const description =
+        typeof m === 'string' ? providerDesc : String(m?.description ?? providerDesc ?? '');
 
       out.push({
         value: `${providerID}/${modelID}`,
@@ -554,7 +571,9 @@ function mapProvidersToModels(
     }
   }
 
-  out.sort((a, b) => String(a.displayName ?? a.value).localeCompare(String(b.displayName ?? b.value)));
+  out.sort((a, b) =>
+    String(a.displayName ?? a.value).localeCompare(String(b.displayName ?? b.value))
+  );
   return out;
 }
 
@@ -575,8 +594,10 @@ async function handleGetClaudeConfig(
       ? undefined
       : await readJsonFile(getProjectGuiConfigPath(cwd, configType)).catch(() => undefined);
 
-  const merged = scope === 'merged' ? { ...(userConfig ?? {}), ...(projectConfig ?? {}) } : undefined;
-  const config = (scope === 'user' ? userConfig : scope === 'project' ? projectConfig : merged) ?? {};
+  const merged =
+    scope === 'merged' ? { ...(userConfig ?? {}), ...(projectConfig ?? {}) } : undefined;
+  const config =
+    (scope === 'user' ? userConfig : scope === 'project' ? projectConfig : merged) ?? {};
 
   if (!config.env) config.env = {};
   if (!config.permissions) config.permissions = { allow: [], deny: [] };
@@ -607,14 +628,17 @@ async function handleSaveClaudeConfig(
   }
 }
 
-async function handleGetMcpServers(deps: OpencodeAgentRequestsDeps): Promise<GetMcpServersResponse> {
+async function handleGetMcpServers(
+  deps: OpencodeAgentRequestsDeps
+): Promise<GetMcpServersResponse> {
   const cwd = deps.workspaceService.getDefaultWorkspaceFolder()?.uri.fsPath ?? process.cwd();
   try {
     const raw = await deps.client.getMcpStatus(cwd);
     const entries = Object.entries(raw ?? {});
     const mcpServers = entries.map(([name, status]) => ({
       name,
-      status: typeof (status as any)?.status === 'string' ? String((status as any).status) : 'unknown'
+      status:
+        typeof (status as any)?.status === 'string' ? String((status as any).status) : 'unknown'
     }));
     return { type: 'get_mcp_servers_response', mcpServers };
   } catch (error) {
@@ -634,7 +658,8 @@ async function handleGetAgents(deps: OpencodeAgentRequestsDeps): Promise<GetAgen
   const mapped = agents.map((a) => {
     const name = String(a?.name ?? a?.id ?? a?.slug ?? 'agent');
     const description = String(a?.description ?? a?.prompt ?? '');
-    const category = String(a?.category ?? a?.type ?? 'OpenCode');
+    const mode = String(a?.mode ?? a?.category ?? a?.type ?? 'subagent').toLowerCase();
+    const category = mode === 'primary' || mode === 'all' ? 'Primary' : 'Subagent';
 
     const configuredEnabled = ohMyConfig?.agents?.[name]?.enabled;
     const enabled =
@@ -646,6 +671,8 @@ async function handleGetAgents(deps: OpencodeAgentRequestsDeps): Promise<GetAgen
             ? !a.disabled
             : true;
 
+    const hidden = a?.hidden === true;
+
     return {
       name,
       description,
@@ -653,7 +680,8 @@ async function handleGetAgents(deps: OpencodeAgentRequestsDeps): Promise<GetAgen
       path: name,
       tools: Array.isArray(a?.tools) ? a.tools.map((t: any) => String(t)) : undefined,
       model: a?.model ? String(a.model) : undefined,
-      enabled
+      enabled,
+      hidden
     };
   });
 
@@ -708,7 +736,9 @@ async function handleGetSkills(deps: OpencodeAgentRequestsDeps): Promise<GetSkil
     id: h.id,
     name: h.id,
     description: h.description,
-    enabled: !(Array.isArray(ohMyConfig?.disabled_hooks) ? ohMyConfig.disabled_hooks : []).includes(h.id),
+    enabled: !(Array.isArray(ohMyConfig?.disabled_hooks) ? ohMyConfig.disabled_hooks : []).includes(
+      h.id
+    ),
     path: h.id
   }));
 
@@ -887,10 +917,15 @@ async function handleOpenContent(
   return { type: 'open_content_response', updatedContent };
 }
 
-async function handleOpenDiff(deps: OpencodeAgentRequestsDeps, request: any): Promise<OpenDiffResponse> {
+async function handleOpenDiff(
+  deps: OpencodeAgentRequestsDeps,
+  request: any
+): Promise<OpenDiffResponse> {
   const cwd = deps.workspaceService.getDefaultWorkspaceFolder()?.uri.fsPath ?? process.cwd();
   const originalPath = resolveFilePath(String(request.originalFilePath ?? ''), cwd);
-  const fallbackNewPath = request.newFilePath ? resolveFilePath(String(request.newFilePath), cwd) : undefined;
+  const fallbackNewPath = request.newFilePath
+    ? resolveFilePath(String(request.newFilePath), cwd)
+    : undefined;
 
   const rightPath = await prepareDiffRightFile(originalPath, fallbackNewPath, request.edits ?? []);
   const leftExists = await pathExists(originalPath);
@@ -912,7 +947,9 @@ async function handleOpenDiff(deps: OpencodeAgentRequestsDeps, request: any): Pr
   return { type: 'open_diff_response', newEdits: request.edits ?? [] };
 }
 
-async function handleNewConversationTab(deps: OpencodeAgentRequestsDeps): Promise<NewConversationTabResponse> {
+async function handleNewConversationTab(
+  deps: OpencodeAgentRequestsDeps
+): Promise<NewConversationTabResponse> {
   try {
     await vscode.commands.executeCommand('opencode.chatView.focus');
   } catch (error) {
@@ -921,7 +958,10 @@ async function handleNewConversationTab(deps: OpencodeAgentRequestsDeps): Promis
   return { type: 'new_conversation_tab_response' };
 }
 
-async function handleOpenConfigFile(deps: OpencodeAgentRequestsDeps, configType: string): Promise<void> {
+async function handleOpenConfigFile(
+  deps: OpencodeAgentRequestsDeps,
+  configType: string
+): Promise<void> {
   const cwd = deps.workspaceService.getDefaultWorkspaceFolder()?.uri.fsPath ?? process.cwd();
 
   if (configType === 'auth') {
@@ -971,9 +1011,9 @@ async function handleGetOpencodeConfigFile(
       configType === 'auth'
         ? ''
         : exists
-          ? Buffer.from(await vscode.workspace.fs.readFile(vscode.Uri.file(resolved.path))).toString(
-              'utf8'
-            )
+          ? Buffer.from(
+              await vscode.workspace.fs.readFile(vscode.Uri.file(resolved.path))
+            ).toString('utf8')
           : '';
 
     return {
@@ -1094,7 +1134,9 @@ async function handleSetOpencodeAuthApiKey(
       raw = undefined;
     }
 
-    const json = raw ? (JSON.parse(Buffer.from(raw).toString('utf8') || '{}') as Record<string, any>) : {};
+    const json = raw
+      ? (JSON.parse(Buffer.from(raw).toString('utf8') || '{}') as Record<string, any>)
+      : {};
 
     const key = String(apiKey ?? '');
     if (!key) {
@@ -1126,7 +1168,11 @@ async function handleOpenInTerminal(deps: OpencodeAgentRequestsDeps): Promise<vo
   terminal.sendText(opencodePath, true);
 }
 
-async function openFile(deps: OpencodeAgentRequestsDeps, filePath: string, location?: any): Promise<void> {
+async function openFile(
+  deps: OpencodeAgentRequestsDeps,
+  filePath: string,
+  location?: any
+): Promise<void> {
   const cwd = deps.workspaceService.getDefaultWorkspaceFolder()?.uri.fsPath ?? process.cwd();
   const absolutePath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
   const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(absolutePath));
@@ -1242,7 +1288,10 @@ async function resolveOpencodeConfigFilePath(
   return { path: jsoncPath, scope: resolvedScope };
 }
 
-function getUserGuiConfigPath(deps: OpencodeAgentRequestsDeps, configType: 'settings' | 'mcp'): string {
+function getUserGuiConfigPath(
+  deps: OpencodeAgentRequestsDeps,
+  configType: 'settings' | 'mcp'
+): string {
   const baseDir = getUserGuiConfigDir(deps);
   return path.join(
     baseDir,
@@ -1534,7 +1583,8 @@ async function handleListSessions(deps: OpencodeAgentRequestsDeps): Promise<List
     .filter((s) => !s?.directory || String(s.directory) === cwd)
     .map((s) => ({
       id: String(s.id),
-      parentId: typeof s?.parentID === 'string' && s.parentID.trim() ? String(s.parentID) : undefined,
+      parentId:
+        typeof s?.parentID === 'string' && s.parentID.trim() ? String(s.parentID) : undefined,
       title: String(s?.title ?? ''),
       lastModified: Number(s?.time?.updated ?? s?.time?.created ?? Date.now()),
       messageCount: toMessageCount(s),
@@ -1556,7 +1606,8 @@ async function handleDeleteSession(
     return { type: 'delete_session_response', success: false };
   }
 
-  const fallbackCwd = deps.workspaceService.getDefaultWorkspaceFolder()?.uri.fsPath ?? process.cwd();
+  const fallbackCwd =
+    deps.workspaceService.getDefaultWorkspaceFolder()?.uri.fsPath ?? process.cwd();
   const cwd = await resolveSessionDirectory(deps.client, id, fallbackCwd);
   const success = await deps.client.deleteSession(id, cwd);
   return { type: 'delete_session_response', success: !!success };
@@ -1566,7 +1617,8 @@ async function handleGetSession(
   deps: OpencodeAgentRequestsDeps,
   sessionId: string
 ): Promise<GetSessionResponse> {
-  const fallbackCwd = deps.workspaceService.getDefaultWorkspaceFolder()?.uri.fsPath ?? process.cwd();
+  const fallbackCwd =
+    deps.workspaceService.getDefaultWorkspaceFolder()?.uri.fsPath ?? process.cwd();
   const cwd = await resolveSessionDirectory(deps.client, sessionId, fallbackCwd);
   const raw = await deps.client.listMessages(sessionId, cwd);
   const items: Array<{ info: OpenCodeMessageInfo; parts: any[] }> = Array.isArray(raw)
@@ -1597,7 +1649,9 @@ async function handleGetSession(
       const providerID = String(
         (info as any)?.providerID ?? infoModel?.providerID ?? infoModel?.providerId ?? ''
       ).trim();
-      const modelID = String((info as any)?.modelID ?? infoModel?.modelID ?? infoModel?.modelId ?? '').trim();
+      const modelID = String(
+        (info as any)?.modelID ?? infoModel?.modelID ?? infoModel?.modelId ?? ''
+      ).trim();
       const modelValue = providerID && modelID ? `${providerID}/${modelID}` : undefined;
       const contextWindow = modelValue ? deps.modelContextWindowById.get(modelValue) : undefined;
       const usage = deps.buildUsageFromTokens((info as any).tokens, { contextWindow });
@@ -1628,7 +1682,10 @@ async function handleGetSession(
                 {
                   type: 'tool_result',
                   tool_use_id: toolUseId,
-                  content: tp.state?.status === 'completed' ? (tp.state.output ?? '') : (tp.state.error ?? ''),
+                  content:
+                    tp.state?.status === 'completed'
+                      ? (tp.state.output ?? '')
+                      : (tp.state.error ?? ''),
                   is_error: tp.state?.status === 'error'
                 }
               ]
@@ -1669,7 +1726,10 @@ async function handleGetSession(
         events.push({
           type: 'assistant',
           timestamp: Number(
-            (info as any).time?.completed ?? (info as any).time?.updated ?? (info as any).time?.created ?? Date.now()
+            (info as any).time?.completed ??
+              (info as any).time?.updated ??
+              (info as any).time?.created ??
+              Date.now()
           ),
           message: { id: (info as any).id, role: 'assistant', content: [], usage }
         });

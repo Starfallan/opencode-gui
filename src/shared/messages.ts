@@ -379,6 +379,56 @@ export interface GetSavedSessionResponse {
 }
 
 /**
+ * 保存选中的 agent
+ */
+export interface SaveSelectedAgentRequest {
+  type: 'save-selected-agent';
+  agentName: string;
+}
+
+export interface SaveSelectedAgentResponse {
+  type: 'save-selected-agent_response';
+  success: boolean;
+}
+
+/**
+ * 获取保存的 agent
+ */
+export interface GetSavedAgentRequest {
+  type: 'get-saved-agent';
+}
+
+export interface GetSavedAgentResponse {
+  type: 'get-saved-agent_response';
+  agentName?: string;
+}
+
+/**
+ * 保存选中的 model
+ */
+export interface SaveSelectedModelRequest {
+  type: 'save-selected-model';
+  modelId: string;
+}
+
+export interface SaveSelectedModelResponse {
+  type: 'save-selected-model_response';
+  success: boolean;
+}
+
+/**
+ * 获取保存的 model
+ */
+export interface GetSavedModelRequest {
+  type: 'get-saved-model';
+}
+
+export interface GetSavedModelResponse {
+  type: 'get-saved-model_response';
+  modelId?: string;
+}
+
+/**
  * 执行命令
  */
 export interface ExecRequest {
@@ -956,6 +1006,10 @@ export type WebViewRequest =
   | GetSessionRequest
   | SaveActiveSessionRequest
   | GetSavedSessionRequest
+  | SaveSelectedAgentRequest
+  | GetSavedAgentRequest
+  | SaveSelectedModelRequest
+  | GetSavedModelRequest
   | ExecRequest
   | ListFilesRequest
   | OpenURLRequest
@@ -1003,6 +1057,10 @@ export type WebViewRequestResponse =
   | GetSessionResponse
   | SaveActiveSessionResponse
   | GetSavedSessionResponse
+  | SaveSelectedAgentResponse
+  | GetSavedAgentResponse
+  | SaveSelectedModelResponse
+  | GetSavedModelResponse
   | ExecResponse
   | ListFilesResponse
   | OpenURLResponse

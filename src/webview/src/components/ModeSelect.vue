@@ -14,7 +14,7 @@
 
     <template #content="{ close }">
       <DropdownItem
-        v-for="(pm, index) in primaryAgentModes"
+        v-for="(pm, index) in primaryAgents"
         :key="pm.id"
         :item="{
           id: pm.id,
@@ -36,19 +36,29 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, watch, onMounted } from 'vue';
 import { DropdownTrigger, DropdownItem } from './Dropdown';
+import { useAgentManagement } from '../composables/useAgentManagement';
+import { inject } from 'vue';
+import { RuntimeKey } from '../composables/runtimeContext';
+import type { Connection } from '../core/ConnectionManager';
 
-export type PrimaryAgentMode = 'build' | 'plan';
+export type PrimaryAgentMode = string;
 
 export interface PrimaryAgentModeConfig {
-  id: PrimaryAgentMode;
+  id: string;
   label: string;
   description: string;
   icon: string;
+  color?: string;
 }
 
-const primaryAgentModes: PrimaryAgentModeConfig[] = [
+const runtime = inject(RuntimeKey);
+
+const { primaryAgents: fetchedPrimaryAgents, isInitialized: agentsInitialized } =
+  useAgentManagement();
+
+const fallbackModes: PrimaryAgentModeConfig[] = [
   {
     id: 'build',
     label: 'Build',
@@ -68,7 +78,7 @@ interface Props {
 }
 
 interface Emits {
-  (e: 'primary-agent-select', mode: PrimaryAgentMode): void;
+  (e: 'primary-agent-select', mode: string, modelValue?: string): void;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -77,20 +87,67 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<Emits>();
 
-const effectivePrimaryAgentMode = computed<PrimaryAgentMode>(() => {
+const effectivePrimaryAgentMode = computed<string>(() => {
   return props.primaryAgentMode ?? 'build';
+});
+
+const primaryAgents = computed<PrimaryAgentModeConfig[]>(() => {
+  if (fetchedPrimaryAgents.value.length > 0) {
+    return fetchedPrimaryAgents.value.map((a) => ({
+      id: a.id,
+      label: a.label,
+      description: a.description || '',
+      icon: a.icon,
+      color: a.color
+    }));
+  }
+  return fallbackModes;
 });
 
 const currentModeConfig = computed(() => {
   return (
-    primaryAgentModes.find((m) => m.id === effectivePrimaryAgentMode.value) ?? primaryAgentModes[0]
+    primaryAgents.value.find((m) => m.id === effectivePrimaryAgentMode.value) ??
+    primaryAgents.value[0] ??
+    fallbackModes[0]
   );
 });
 
-function handlePrimaryAgentSelect(mode: PrimaryAgentMode, close: () => void) {
-  close();
-  emit('primary-agent-select', mode);
+function getAgentModelValue(agentName: string): string | undefined {
+  const { getAgentModelValue: getModelValue } = useAgentManagement();
+  return getModelValue(agentName);
 }
+
+function handlePrimaryAgentSelect(mode: string, close: () => void) {
+  close();
+
+  const modelValue = getAgentModelValue(mode);
+  emit('primary-agent-select', mode, modelValue);
+
+  if (runtime?.connectionManager) {
+    const conn = runtime.connectionManager.connection() as unknown as Connection;
+    if (conn?.saveSelectedAgent) {
+      conn.saveSelectedAgent(mode).catch((e) => {
+        console.warn('[ModeSelect] Failed to save selected agent:', e);
+      });
+    }
+  }
+}
+
+onMounted(async () => {
+  if (!runtime?.connectionManager || agentsInitialized.value) return;
+
+  const conn = runtime.connectionManager.connection() as unknown as Connection;
+  if (conn?.getSavedAgent) {
+    try {
+      const saved = await conn.getSavedAgent();
+      if (saved?.agentName) {
+        emit('primary-agent-select', saved.agentName, getAgentModelValue(saved.agentName));
+      }
+    } catch (e) {
+      console.warn('[ModeSelect] Failed to load saved agent:', e);
+    }
+  }
+});
 </script>
 
 <style scoped>

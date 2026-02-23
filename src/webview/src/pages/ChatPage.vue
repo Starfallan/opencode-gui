@@ -617,19 +617,31 @@ async function handleVariantSelect(variant: string) {
   await s.setVariant(variant);
 }
 
-async function handlePrimaryAgentSelect(mode: 'build' | 'plan') {
+async function handlePrimaryAgentSelect(mode: string, modelValue?: string) {
   const s = session.value;
   if (!s) return;
 
   await s.setPermissionMode(mode === 'plan' ? 'plan' : 'default');
+
+  if (modelValue) {
+    await handleModelSelect(modelValue);
+  }
 }
 
 async function handleModelSelect(modelId: string) {
   const s = session.value;
   if (!s) return;
 
-  // Model selection is applied via prompt body (handled by extension), not via `/model` chat command.
   await s.setModel({ value: modelId });
+
+  const conn = runtime?.connectionManager?.connection();
+  if (conn?.saveSelectedModel) {
+    try {
+      await conn.saveSelectedModel(modelId);
+    } catch (e) {
+      console.warn('[ChatPage] Failed to save selected model:', e);
+    }
+  }
 }
 
 async function handleOpenProgress() {
