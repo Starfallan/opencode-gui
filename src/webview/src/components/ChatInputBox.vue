@@ -1,6 +1,21 @@
 <template>
   <!-- 输入框 - 三行布局结构 -->
-  <div class="full-input-box" style="position: relative">
+  <div
+    class="full-input-box"
+    :class="{ 'drag-over': isDraggingOver }"
+    style="position: relative"
+    @dragover.prevent="handleDragOver"
+    @dragleave="handleDragLeave"
+    @drop="handleDrop"
+  >
+    <!-- 拖拽提示覆盖层 -->
+    <div v-if="isDraggingOver" class="drop-overlay">
+      <div class="drop-hint">
+        <span class="codicon codicon-add" style="font-size: 24px"></span>
+        <span>释放以添加文件引用</span>
+      </div>
+    </div>
+
     <!-- 附件列表（如果有附件） -->
     <div v-if="attachments && attachments.length > 0" class="attachments-list">
       <div v-for="attachment in attachments" :key="attachment.id" class="attachment-item">
@@ -51,8 +66,6 @@
       @input="handleInput"
       @keydown="handleKeydown"
       @paste="handlePaste"
-      @dragover.prevent
-      @drop="handleDrop"
     />
 
     <!-- 第二行：ButtonArea 组件 + TokenIndicator -->
@@ -216,7 +229,7 @@ const props = withDefaults(defineProps<Props>(), {
   selectedVariant: undefined,
   conversationWorking: false,
   attachments: () => [],
-  messageQueue: () => [],
+  messageQueue: () => []
 });
 
 const emit = defineEmits<Emits>();
@@ -625,10 +638,100 @@ function handlePaste(event: ClipboardEvent) {
   }
 }
 
+// 拖拽状态
+const isDraggingOver = ref(false);
+
+function handleDragOver(event: DragEvent) {
+  event.preventDefault();
+  isDraggingOver.value = true;
+}
+
+function handleDragLeave(event: DragEvent) {
+  event.preventDefault();
+  const target = event.currentTarget as HTMLElement;
+  const relatedTarget = event.relatedTarget as HTMLElement;
+  if (relatedTarget && target.contains(relatedTarget)) {
+    return;
+  }
+  isDraggingOver.value = false;
+}
+
 function handleDrop(event: DragEvent) {
   event.preventDefault();
+  event.stopPropagation();
+  isDraggingOver.value = false;
+
+  console.log('[ChatInputBox] Drop event:', {
+    types: event.dataTransfer?.types,
+    files: event.dataTransfer?.files?.length,
+    items: event.dataTransfer?.items?.length
+  });
+
+  // 收集所有检测到的文件路径
+  const filePaths: string[] = [];
+
+  // 方法1: 从 text/plain 获取文件路径（VSCode 资源管理器拖拽时使用此方式）
+  const textData = event.dataTransfer?.getData('text/plain');
+  if (textData) {
+    console.log('[ChatInputBox] text/plain data:', textData);
+    const lines = textData
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line);
+    for (const line of lines) {
+      if (line.startsWith('file://') || line.startsWith('/') || /^[a-zA-Z]:/.test(line)) {
+        filePaths.push(line);
+      }
+    }
+    if (filePaths.length > 0) {
+      console.log('[ChatInputBox] Dropped from text/plain:', filePaths);
+    }
+  }
+
+  // 方法2: 从 text/uri-list 获取文件 URI
+  if (filePaths.length === 0) {
+    const uriList = event.dataTransfer?.getData('text/uri-list');
+    if (uriList) {
+      console.log('[ChatInputBox] text/uri-list data:', uriList);
+      const uris = uriList
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.startsWith('file://'));
+      if (uris.length > 0) {
+        filePaths.push(...uris);
+        console.log('[ChatInputBox] Dropped from uri-list:', uris);
+      }
+    }
+  }
+
+  // 方法3: 从 dataTransfer.files 获取（外部文件拖拽）
   const files = event.dataTransfer?.files;
-  if (files && files.length > 0) {
+  if (filePaths.length === 0 && files && files.length > 0) {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i] as any;
+      if (file.path) {
+        filePaths.push(file.path);
+      }
+    }
+    if (filePaths.length > 0) {
+      console.log('[ChatInputBox] Dropped from files:', filePaths);
+    }
+  }
+
+  // 如果找到了文件路径，发送到 extension
+  if (filePaths.length > 0) {
+    console.log('[ChatInputBox] Sending file paths to extension:', filePaths);
+    const vscodeApi = (window as any).vscode;
+    if (vscodeApi) {
+      vscodeApi.postMessage({
+        type: 'handle-dropped-files',
+        payload: {
+          filePaths: filePaths
+        }
+      });
+    }
+  } else if (files && files.length > 0) {
+    // 如果是外部文件（图片等），作为附件处理
     handleAddFiles(files);
   }
 }
@@ -1019,5 +1122,39 @@ defineExpose({
 
 .remove-button:hover {
   opacity: 1 !important;
+}
+
+/* 拖拽相关样式 */
+.full-input-box.drag-over {
+  background-color: var(--vscode-list-dropBackground, rgba(255, 255, 255, 0.1));
+}
+
+.drop-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--vscode-list-dropBackground, rgba(0, 122, 204, 0.1));
+  border: 2px dashed var(--vscode-focusBorder);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.drop-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--vscode-foreground);
+  opacity: 0.8;
+}
+
+.drop-hint span:last-child {
+  font-size: 14px;
 }
 </style>
