@@ -488,8 +488,20 @@ watch(
   }
 );
 
+watch(
+  () => {
+    const msgs = messages.value;
+    if (msgs.length === 0) return 0;
+    const last = msgs[msgs.length - 1];
+    return last?.content?.length ?? 0;
+  },
+  async () => {
+    await nextTick();
+    scrollToBottom();
+  }
+);
+
 watch(permissionRequestsLen, async () => {
-  // 有权限请求出现时也确保滚动到底部
   await nextTick();
   scrollToBottom();
 });
@@ -979,7 +991,7 @@ async function handleSendQueuedMessageNow(id: string) {
   background-color: var(--vscode-sideBar-background);
   /* border-top: 1px solid var(--vscode-panel-border); */
   max-width: 1200px;
-  width: 100%;
+  /* width: 100%; */
   align-self: center;
 }
 
