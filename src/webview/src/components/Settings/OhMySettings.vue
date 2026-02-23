@@ -17,7 +17,7 @@ import OhMyConfigCard from './OhMyConfigCard.vue';
 
 <style scoped>
 .ohmy-settings {
-  padding: 20px;
+  /* padding: 20px; */
 }
 
 .section-title {

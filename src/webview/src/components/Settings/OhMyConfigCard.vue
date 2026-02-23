@@ -1,14 +1,14 @@
 <template>
   <div class="card">
-      <div class="card-header">
-        <div class="card-title-row">
-          <div class="card-title">oh-my-opencode.json</div>
-          <div class="badge" :class="dirty ? 'badge-dirty' : 'badge-ok'">
-            {{ dirty ? '未保存' : state.exists ? '已加载' : '未创建' }}
-          </div>
+    <div class="card-header">
+      <div class="card-title-row">
+        <div class="card-title">oh-my-opencode.json</div>
+        <div class="badge" :class="dirty ? 'badge-dirty' : 'badge-ok'">
+          {{ dirty ? '未保存' : state.exists ? '已加载' : '未创建' }}
         </div>
-      <div class="card-desc">Hooks / Agents 配置（disabled_hooks / agents）</div>
       </div>
+      <div class="card-desc">Hooks / Agents 配置（disabled_hooks / agents）</div>
+    </div>
 
     <div class="card-controls">
       <div class="scope-toggle">
@@ -43,7 +43,9 @@
 
     <div class="path-row" :title="state.path || ''">
       <span class="path-label">路径：</span>
-      <span class="path-value" :class="{ muted: !state.path }">{{ state.path || '（未加载）' }}</span>
+      <span class="path-value" :class="{ muted: !state.path }">{{
+        state.path || '（未加载）'
+      }}</span>
       <span class="path-meta">{{ savedHint }}</span>
     </div>
 
@@ -65,7 +67,8 @@
       <div class="section">
         <div class="section-title">Agents</div>
         <div v-if="agentsUnsupported" class="empty-hint">
-          当前 <code>agents</code> 字段不是对象，GUI 暂不支持表单编辑；请在编辑器打开修复或手动维护。
+          当前 <code>agents</code> 字段不是对象，GUI
+          暂不支持表单编辑；请在编辑器打开修复或手动维护。
         </div>
         <div v-else>
           <div class="agent-add-row">
@@ -105,7 +108,9 @@
                     :popover-style="{ maxWidth: '520px' }"
                   >
                     <template #trigger>
-                      <button class="btn" type="button" :disabled="enabledModels.length === 0">选择</button>
+                      <button class="btn" type="button" :disabled="enabledModels.length === 0">
+                        选择
+                      </button>
                     </template>
                     <template #content="slotProps">
                       <DropdownItem
@@ -124,7 +129,9 @@
                       />
                     </template>
                   </DropdownTrigger>
-                  <button class="btn" type="button" :disabled="!a.model" @click="a.model = ''">清除</button>
+                  <button class="btn" type="button" :disabled="!a.model" @click="a.model = ''">
+                    清除
+                  </button>
                 </div>
               </div>
 
@@ -167,11 +174,14 @@
             </div>
           </label>
         </div>
-        <div v-else class="empty-hint">未获取到 hooks 列表（可先启动 OpenCode server 再重载）。</div>
+        <div v-else class="empty-hint">
+          未获取到 hooks 列表（可先启动 OpenCode server 再重载）。
+        </div>
       </div>
 
       <div class="hint muted">
-        提示：这里只管理 <code>disabled_hooks</code> 与 <code>agents</code>（enabled / replace_plan / model）；其余字段建议在编辑器打开。
+        提示：这里只管理 <code>disabled_hooks</code> 与 <code>agents</code>（enabled / replace_plan
+        / model）；其余字段建议在编辑器打开。
       </div>
     </div>
 
@@ -339,7 +349,8 @@ function normalizeAgents(list: AgentEntry[]): AgentEntry[] {
   for (const item of list || []) {
     const name = String(item?.name ?? '').trim();
     if (!name) continue;
-    const enabled: TriState = item.enabled === 'on' || item.enabled === 'off' ? item.enabled : 'default';
+    const enabled: TriState =
+      item.enabled === 'on' || item.enabled === 'off' ? item.enabled : 'default';
     const replacePlan: TriState =
       item.replacePlan === 'on' || item.replacePlan === 'off' ? item.replacePlan : 'default';
     const model = typeof item?.model === 'string' ? item.model.trim() : '';
@@ -355,7 +366,10 @@ function addAgent() {
     newAgentName.value = '';
     return;
   }
-  agents.value = normalizeAgents([...agents.value, { name, enabled: 'default', replacePlan: 'default', model: '' }]);
+  agents.value = normalizeAgents([
+    ...agents.value,
+    { name, enabled: 'default', replacePlan: 'default', model: '' }
+  ]);
   newAgentName.value = '';
 }
 
@@ -371,7 +385,9 @@ const enabledModels = computed(() => {
 
 function filterModelsBySearch(term: string) {
   const list = enabledModels.value || [];
-  const needle = String(term ?? '').trim().toLowerCase();
+  const needle = String(term ?? '')
+    .trim()
+    .toLowerCase();
   if (!needle) return list;
   return list.filter((m) => {
     const hay = `${m.value} ${m.label ?? ''} ${m.description ?? ''}`.toLowerCase();
@@ -488,7 +504,9 @@ async function save() {
       const desired = normalizeAgents(agents.value || []);
       const desiredSet = new Set(desired.map((a) => a.name));
       const { obj } = parseJsoncObject(state.sourceText);
-      const existingAgents = isPlainObject(obj?.agents) ? (obj.agents as Record<string, any>) : undefined;
+      const existingAgents = isPlainObject(obj?.agents)
+        ? (obj.agents as Record<string, any>)
+        : undefined;
       const existingNames = existingAgents ? Object.keys(existingAgents) : [];
 
       for (const name of existingNames) {
@@ -507,7 +525,9 @@ async function save() {
         const existingIsObj = isPlainObject(existing);
         const shouldReplaceWhole =
           !existingIsObj &&
-          (desiredEnabled !== undefined || desiredReplacePlan !== undefined || desiredModelValue !== undefined);
+          (desiredEnabled !== undefined ||
+            desiredReplacePlan !== undefined ||
+            desiredModelValue !== undefined);
 
         if (shouldReplaceWhole) {
           const newObj: any = {};
@@ -522,19 +542,27 @@ async function save() {
           const enabledExists = Object.prototype.hasOwnProperty.call(existing, 'enabled');
           const replacePlanExists = Object.prototype.hasOwnProperty.call(existing, 'replace_plan');
           const modelExists = Object.prototype.hasOwnProperty.call(existing, 'model');
-          const existingEnabled = typeof (existing as any)?.enabled === 'boolean' ? (existing as any).enabled : undefined;
+          const existingEnabled =
+            typeof (existing as any)?.enabled === 'boolean' ? (existing as any).enabled : undefined;
           const existingReplacePlan =
-            typeof (existing as any)?.replace_plan === 'boolean' ? (existing as any).replace_plan : undefined;
-          const existingModel = typeof (existing as any)?.model === 'string' ? String((existing as any).model) : undefined;
+            typeof (existing as any)?.replace_plan === 'boolean'
+              ? (existing as any).replace_plan
+              : undefined;
+          const existingModel =
+            typeof (existing as any)?.model === 'string'
+              ? String((existing as any).model)
+              : undefined;
 
           if (desiredEnabled === undefined) {
-            if (enabledExists) next = applyModify(next, ['agents', entry.name, 'enabled'], undefined);
+            if (enabledExists)
+              next = applyModify(next, ['agents', entry.name, 'enabled'], undefined);
           } else if (existingEnabled !== desiredEnabled) {
             next = applyModify(next, ['agents', entry.name, 'enabled'], desiredEnabled);
           }
 
           if (desiredReplacePlan === undefined) {
-            if (replacePlanExists) next = applyModify(next, ['agents', entry.name, 'replace_plan'], undefined);
+            if (replacePlanExists)
+              next = applyModify(next, ['agents', entry.name, 'replace_plan'], undefined);
           } else if (existingReplacePlan !== desiredReplacePlan) {
             next = applyModify(next, ['agents', entry.name, 'replace_plan'], desiredReplacePlan);
           }
@@ -624,8 +652,9 @@ onMounted(async () => {
 .card {
   border: 1px solid var(--vscode-panel-border);
   border-radius: 10px;
-  overflow: visible;
+  overflow: hidden;
   background: color-mix(in srgb, var(--vscode-editor-background) 90%, transparent);
+  max-width: 100%;
 }
 
 .card-header {
@@ -673,12 +702,14 @@ onMounted(async () => {
   padding: 10px 12px;
   border-bottom: 1px solid var(--vscode-panel-border);
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .scope-toggle {
   display: inline-flex;
   gap: 6px;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .scope-btn {
@@ -706,6 +737,7 @@ onMounted(async () => {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .btn {
@@ -744,6 +776,8 @@ onMounted(async () => {
   padding: 8px 12px;
   border-bottom: 1px solid var(--vscode-panel-border);
   font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .path-label {
@@ -832,6 +866,7 @@ onMounted(async () => {
   gap: 8px;
   align-items: center;
   margin-bottom: 10px;
+  min-width: 0;
 }
 
 .form-input {
@@ -842,6 +877,8 @@ onMounted(async () => {
   background: var(--vscode-input-background);
   color: var(--vscode-input-foreground);
   font-size: 12px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .form-input-compact {
@@ -886,12 +923,14 @@ onMounted(async () => {
   border-radius: 8px;
   border: 1px solid var(--vscode-panel-border);
   background: color-mix(in srgb, var(--vscode-editor-background) 85%, transparent);
+  overflow: hidden;
 }
 
 .agent-head {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 
 .agent-name {
@@ -900,6 +939,7 @@ onMounted(async () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
 
 .agent-row {
@@ -907,6 +947,7 @@ onMounted(async () => {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .agent-control {
@@ -922,11 +963,13 @@ onMounted(async () => {
   align-items: center;
   flex-wrap: wrap;
   flex: 1;
+  min-width: 0;
 }
 
 .agent-model-row .form-input-compact {
-  min-width: 260px;
+  min-width: 120px;
   flex: 1;
+  max-width: 100%;
 }
 
 .agent-control-label {
@@ -934,16 +977,18 @@ onMounted(async () => {
 }
 
 .agent-control-label-fixed {
-  width: 72px;
+  width: 52px;
   flex-shrink: 0;
 }
 
 .agent-row-model {
   align-items: flex-start;
+  min-width: 0;
 }
 
 .agent-row-flags {
   gap: 14px;
+  flex-wrap: wrap;
 }
 
 .btn.danger {

@@ -23,17 +23,20 @@
     </div>
 
     <div class="settings-content">
-      <nav class="settings-nav">
-        <button
-          v-for="section in sections"
-          :key="section.id"
-          :class="['nav-item', { active: currentSection === section.id }]"
-          @click="currentSection = section.id"
-        >
-          <span :class="`codicon codicon-${section.icon}`"></span>
-          <span class="nav-label">{{ section.label }}</span>
-          <span v-if="section.needsRestart" class="badge-restart" title="需要重启会话">!</span>
-        </button>
+      <nav class="settings-nav-container">
+        <div class="settings-nav">
+          <button
+            v-for="section in sections"
+            :key="section.id"
+            :class="['nav-item', { active: currentSection === section.id }]"
+            :title="section.label"
+            @click="currentSection = section.id"
+          >
+            <span :class="`codicon codicon-${section.icon}`"></span>
+            <span class="nav-label">{{ section.label }}</span>
+            <span v-if="section.needsRestart" class="badge-restart" title="需要重启会话">!</span>
+          </button>
+        </div>
       </nav>
 
       <div class="settings-panel">
@@ -51,76 +54,76 @@
 </template>
 
 <script setup lang="ts">
-import { inject, onUnmounted, ref } from 'vue'
-import McpServersSettings from '../components/Settings/McpServersSettings.vue'
-import OpenCodeFilesSettings from '../components/Settings/OpenCodeFilesSettings.vue'
-import OhMySettings from '../components/Settings/OhMySettings.vue'
-import ProvidersSettings from '../components/Settings/ProvidersSettings.vue'
-import AgentsSettings from '../components/Settings/AgentsSettings.vue'
-import SkillsSettings from '../components/Settings/SkillsSettings.vue'
-import { RuntimeKey } from '../composables/runtimeContext'
+import { inject, onUnmounted, ref } from 'vue';
+import McpServersSettings from '../components/Settings/McpServersSettings.vue';
+import OpenCodeFilesSettings from '../components/Settings/OpenCodeFilesSettings.vue';
+import OhMySettings from '../components/Settings/OhMySettings.vue';
+import ProvidersSettings from '../components/Settings/ProvidersSettings.vue';
+import AgentsSettings from '../components/Settings/AgentsSettings.vue';
+import SkillsSettings from '../components/Settings/SkillsSettings.vue';
+import { RuntimeKey } from '../composables/runtimeContext';
 
 interface SettingsSection {
-  id: string
-  label: string
-  icon: string
-  needsRestart?: boolean
+  id: string;
+  label: string;
+  icon: string;
+  needsRestart?: boolean;
 }
 
 defineEmits<{
-  close: []
-}>()
+  close: [];
+}>();
 
-const currentSection = ref('opencodeFiles')
-const runtime = inject(RuntimeKey)
+const currentSection = ref('opencodeFiles');
+const runtime = inject(RuntimeKey);
 if (!runtime) {
-  throw new Error('[SettingsPage] Runtime not provided')
+  throw new Error('[SettingsPage] Runtime not provided');
 }
 
-const isApplying = ref(false)
-const applyMessage = ref('')
-const applyError = ref(false)
-let applyMessageTimer: ReturnType<typeof setTimeout> | undefined
+const isApplying = ref(false);
+const applyMessage = ref('');
+const applyError = ref(false);
+let applyMessageTimer: ReturnType<typeof setTimeout> | undefined;
 
 function scheduleClearApplyMessage() {
-  if (applyMessageTimer) clearTimeout(applyMessageTimer)
+  if (applyMessageTimer) clearTimeout(applyMessageTimer);
   applyMessageTimer = setTimeout(() => {
-    applyMessage.value = ''
-  }, 5000)
+    applyMessage.value = '';
+  }, 5000);
 }
 
 async function applyConfigNow(): Promise<void> {
-  if (isApplying.value) return
+  if (isApplying.value) return;
 
-  isApplying.value = true
-  applyError.value = false
-  applyMessage.value = ''
+  isApplying.value = true;
+  applyError.value = false;
+  applyMessage.value = '';
 
   try {
-    const connection = await runtime!.connectionManager.get()
-    const resp = await connection.applyOpencodeConfig(true)
+    const connection = await runtime!.connectionManager.get();
+    const resp = await connection.applyOpencodeConfig(true);
     if (resp?.type !== 'apply_opencode_config_response') {
-      throw new Error(`Unexpected response: ${String(resp?.type ?? resp)}`)
+      throw new Error(`Unexpected response: ${String(resp?.type ?? resp)}`);
     }
     if (!resp.success) {
-      throw new Error(String(resp.error ?? '应用失败'))
+      throw new Error(String(resp.error ?? '应用失败'));
     }
 
-    const url = typeof resp.baseUrl === 'string' && resp.baseUrl ? ` (${resp.baseUrl})` : ''
-    applyMessage.value = `配置已生效${url}`
-    scheduleClearApplyMessage()
+    const url = typeof resp.baseUrl === 'string' && resp.baseUrl ? ` (${resp.baseUrl})` : '';
+    applyMessage.value = `配置已生效${url}`;
+    scheduleClearApplyMessage();
   } catch (error) {
-    applyError.value = true
-    applyMessage.value = error instanceof Error ? error.message : String(error)
-    scheduleClearApplyMessage()
+    applyError.value = true;
+    applyMessage.value = error instanceof Error ? error.message : String(error);
+    scheduleClearApplyMessage();
   } finally {
-    isApplying.value = false
+    isApplying.value = false;
   }
 }
 
 onUnmounted(() => {
-  if (applyMessageTimer) clearTimeout(applyMessageTimer)
-})
+  if (applyMessageTimer) clearTimeout(applyMessageTimer);
+});
 
 const sections: SettingsSection[] = [
   {
@@ -154,7 +157,7 @@ const sections: SettingsSection[] = [
     label: 'Skills',
     icon: 'extensions'
   }
-]
+];
 </script>
 
 <style scoped>
@@ -257,6 +260,14 @@ const sections: SettingsSection[] = [
   display: flex;
   flex: 1;
   overflow: hidden;
+  container-type: inline-size;
+}
+
+.settings-nav-container {
+  flex-shrink: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .settings-nav {
@@ -264,7 +275,35 @@ const sections: SettingsSection[] = [
   padding: 12px 8px;
   border-right: 1px solid var(--vscode-panel-border);
   overflow-y: auto;
-  flex-shrink: 0;
+  transition: width 0.2s ease;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+@container (max-width: 500px) {
+  .settings-nav {
+    width: 44px;
+    padding: 8px 4px;
+  }
+
+  .nav-item {
+    justify-content: center;
+    padding: 8px 0;
+  }
+
+  .nav-label {
+    display: none;
+  }
+
+  .badge-restart {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 10px;
+    height: 10px;
+    font-size: 8px;
+  }
 }
 
 .nav-item {

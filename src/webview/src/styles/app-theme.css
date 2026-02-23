@@ -6,10 +6,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Reset body padding */
+body {
+  margin: 0;
+  padding: 0;
+}
+
 /* CSS Variables */
-:root { 
-  color: inherit; 
-} 
+:root {
+  color: inherit;
+}
 
 /* Ensure native form controls (e.g. <select>) follow VS Code theme. */
 .vscode-dark,
@@ -27,7 +33,10 @@ select.form-select,
 select.setting-select {
   background-color: var(--vscode-dropdown-background, var(--vscode-input-background));
   color: var(--vscode-dropdown-foreground, var(--vscode-input-foreground));
-  border-color: var(--vscode-dropdown-border, var(--vscode-input-border, var(--vscode-panel-border)));
+  border-color: var(
+    --vscode-dropdown-border,
+    var(--vscode-input-border, var(--vscode-panel-border))
+  );
 }
 
 select.form-select option,
@@ -37,11 +46,11 @@ select.setting-select optgroup {
   background-color: var(--vscode-dropdown-background, var(--vscode-menu-background)) !important;
   color: var(--vscode-dropdown-foreground, var(--vscode-menu-foreground)) !important;
 }
- 
-html { 
-  --app-claude-orange: #d97757; 
-  --app-claude-clay-button-orange: #c6613f; 
-  --app-claude-ivory: #faf9f5; 
+
+html {
+  --app-claude-orange: #d97757;
+  --app-claude-clay-button-orange: #c6613f;
+  --app-claude-ivory: #faf9f5;
   --app-claude-slate: #141413;
   --app-spacing-small: 4px;
   --app-spacing-medium: 8px;
@@ -49,9 +58,7 @@ html {
   --app-spacing-xlarge: 16px;
   --app-monospace-font-family: var(--vscode-editor-font-family, monospace);
   --app-monospace-font-size: var(--vscode-editor-font-size, 12px);
-  --app-monospace-font-size-small: calc(
-    var(--vscode-editor-font-size, 12px) - 2px
-  );
+  --app-monospace-font-size-small: calc(var(--vscode-editor-font-size, 12px) - 2px);
   --app-primary-foreground: var(--vscode-foreground);
   --app-primary-background: var(--vscode-sideBar-background);
   --app-primary-border-color: var(--vscode-sideBarActivityBarTop-border);
@@ -87,12 +94,8 @@ html {
   --app-progressbar-background: var(--vscode-progressBar-background);
   --app-progressbar-border: var(--vscode-widget-border);
   --app-widget-border: var(--vscode-editorWidget-border);
-  --app-editor-highlight-background: var(
-    --vscode-editor-lineHighlightBackground
-  );
-  --app-ghost-button-hover-background: var(
-    --vscode-statusBarItem-hoverBackground
-  );
+  --app-editor-highlight-background: var(--vscode-editor-lineHighlightBackground);
+  --app-ghost-button-hover-background: var(--vscode-statusBarItem-hoverBackground);
   --app-button-foreground: var(--vscode-button-foreground);
   --app-button-background: var(--vscode-button-background);
   --app-button-hover-background: var(--vscode-button-hoverBackground);
@@ -119,7 +122,9 @@ html {
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  transition: background-color 0.1s ease, opacity 0.1s ease;
+  transition:
+    background-color 0.1s ease,
+    opacity 0.1s ease;
 }
 
 .anysphere-icon-button:hover {
@@ -368,7 +373,6 @@ html {
   color: inherit;
 }
 
-
 .search-input-section {
   display: flex;
   gap: 4px;
@@ -535,11 +539,10 @@ html {
   padding-top: 2px;
   padding-left: 8px;
   font-size: 9px;
-  color: color-mix(in srgb,var(--vscode-foreground) 48%,transparent);
+  color: color-mix(in srgb, var(--vscode-foreground) 48%, transparent);
   flex-shrink: 0;
   gap: 4px;
 }
-
 
 /* 文件图标特殊样式 */
 .show-file-icons {
@@ -563,6 +566,3 @@ html {
 .mentions-menu .show-file-icons .file-icon:before {
   font-size: 17px !important;
 }
-
-
-

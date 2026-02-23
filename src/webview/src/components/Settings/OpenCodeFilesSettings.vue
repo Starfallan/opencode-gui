@@ -20,7 +20,7 @@ import OpencodeConfigCard from './OpencodeConfigCard.vue';
 
 <style scoped>
 .opencode-files-settings {
-  padding: 20px;
+  /* padding: 20px; */
 }
 
 .section-title {

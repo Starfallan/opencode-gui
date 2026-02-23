@@ -28,11 +28,7 @@
 
     <!-- 服务器列表 -->
     <div v-if="serverEntries.length > 0" class="servers-list">
-      <div
-        v-for="[name, config] in serverEntries"
-        :key="name"
-        class="server-item"
-      >
+      <div v-for="[name, config] in serverEntries" :key="name" class="server-item">
         <div class="server-header">
           <div class="server-info">
             <span class="codicon codicon-server"></span>
@@ -56,28 +52,26 @@
                 ]"
               ></span>
             </button>
-            <button
-              class="icon-btn"
-              title="编辑"
-              @click="editServer(name, config)"
-            >
+            <button class="icon-btn" title="编辑" @click="editServer(name, config)">
               <span class="codicon codicon-edit"></span>
             </button>
-            <button
-              class="icon-btn danger"
-              title="删除"
-              @click="removeServer(name)"
-            >
+            <button class="icon-btn danger" title="删除" @click="removeServer(name)">
               <span class="codicon codicon-trash"></span>
             </button>
           </div>
         </div>
         <div class="server-details">
-          <div v-if="config.type === 'local' && config.command && config.command.length > 0" class="detail-row">
+          <div
+            v-if="config.type === 'local' && config.command && config.command.length > 0"
+            class="detail-row"
+          >
             <span class="detail-label">命令:</span>
             <code class="detail-value">{{ config.command[0] }}</code>
           </div>
-          <div v-if="config.type === 'local' && config.command && config.command.length > 1" class="detail-row">
+          <div
+            v-if="config.type === 'local' && config.command && config.command.length > 1"
+            class="detail-row"
+          >
             <span class="detail-label">参数:</span>
             <code class="detail-value">{{ config.command.slice(1).join(' ') }}</code>
           </div>
@@ -263,49 +257,49 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, onMounted, reactive, ref } from 'vue'
-import { applyEdits, modify, parse } from 'jsonc-parser'
-import { RuntimeKey } from '../../composables/runtimeContext'
+import { computed, inject, onMounted, reactive, ref } from 'vue';
+import { applyEdits, modify, parse } from 'jsonc-parser';
+import { RuntimeKey } from '../../composables/runtimeContext';
 
-type Scope = 'user' | 'project'
+type Scope = 'user' | 'project';
 
 type ConfigState = {
-  path: string
-  exists: boolean
-  isLoaded: boolean
-  loading: boolean
-  saving: boolean
-  parseError: string
-  error: string
-  sourceText: string
-  parsed: any
-}
+  path: string;
+  exists: boolean;
+  isLoaded: boolean;
+  loading: boolean;
+  saving: boolean;
+  parseError: string;
+  error: string;
+  sourceText: string;
+  parsed: any;
+};
 
 interface McpOAuthConfig {
-  clientId?: string
-  clientSecret?: string
-  scope?: string
+  clientId?: string;
+  clientSecret?: string;
+  scope?: string;
 }
 
 interface McpServerConfig {
-  type?: 'local' | 'remote'
-  command?: string[]
-  environment?: Record<string, string>
-  url?: string
-  headers?: Record<string, string>
-  oauth?: McpOAuthConfig | false
-  enabled?: boolean
-  timeout?: number
+  type?: 'local' | 'remote';
+  command?: string[];
+  environment?: Record<string, string>;
+  url?: string;
+  headers?: Record<string, string>;
+  oauth?: McpOAuthConfig | false;
+  enabled?: boolean;
+  timeout?: number;
 }
 
 const runtime = (() => {
-  const rt = inject(RuntimeKey)
-  if (!rt) throw new Error('[McpServersSettings] Runtime not provided')
-  return rt
-})()
+  const rt = inject(RuntimeKey);
+  if (!rt) throw new Error('[McpServersSettings] Runtime not provided');
+  return rt;
+})();
 
 // 配置范围
-const configScope = ref<Scope>('user')
+const configScope = ref<Scope>('user');
 
 const state = reactive<ConfigState>({
   path: '',
@@ -317,364 +311,369 @@ const state = reactive<ConfigState>({
   error: '',
   sourceText: '',
   parsed: {}
-})
+});
 
-const showAddDialog = ref(false)
-const showImportDialog = ref(false)
-const isEditing = ref(false)
-const editingServerName = ref('')
+const showAddDialog = ref(false);
+const showImportDialog = ref(false);
+const isEditing = ref(false);
+const editingServerName = ref('');
 
 const editingServer = ref<{
-  name: string
-  type: 'local' | 'remote'
-  command: string
-  url: string
+  name: string;
+  type: 'local' | 'remote';
+  command: string;
+  url: string;
 }>({
   name: '',
   type: 'local',
   command: '',
   url: ''
-})
+});
 
-const argsText = ref('')
-const envText = ref('')
-const headersText = ref('')
+const argsText = ref('');
+const envText = ref('');
+const headersText = ref('');
 
 // JSON 导入相关
-const importJsonText = ref('')
-const importError = ref('')
-const importPreview = ref<string[]>([])
-const parsedServers = ref<Record<string, McpServerConfig>>({})
+const importJsonText = ref('');
+const importError = ref('');
+const importPreview = ref<string[]>([]);
+const parsedServers = ref<Record<string, McpServerConfig>>({});
 
 // 根据选择的范围显示对应的服务器列表
 const serverEntries = computed<Array<[string, McpServerConfig]>>(() => {
-  const raw = state.parsed?.mcp
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return []
+  const raw = state.parsed?.mcp;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
   return Object.entries(raw as Record<string, unknown>)
     .filter(([name]) => !!name)
     .map(([name, cfg]) => [name, normalizeMcpConfig(cfg)] as [string, McpServerConfig])
-    .sort((a, b) => a[0].localeCompare(b[0]))
-})
+    .sort((a, b) => a[0].localeCompare(b[0]));
+});
 
 // 加载配置
 onMounted(async () => {
-  await loadConfig()
-})
+  await loadConfig();
+});
 
 function parseJsoncObject(text: string): { obj: any; error: string } {
-  const errors: any[] = []
+  const errors: any[] = [];
   const out = parse(text ?? '', errors, {
     allowTrailingComma: true,
     disallowComments: false,
     allowEmptyContent: true
-  }) as any
+  }) as any;
   if (errors.length > 0) {
-    const first = errors[0]
-    const offset = typeof first?.offset === 'number' ? first.offset : undefined
+    const first = errors[0];
+    const offset = typeof first?.offset === 'number' ? first.offset : undefined;
     return {
       obj: out && typeof out === 'object' ? out : {},
       error: `JSONC 解析失败${typeof offset === 'number' ? ` (offset ${offset})` : ''}`
-    }
+    };
   }
-  return { obj: out && typeof out === 'object' ? out : {}, error: '' }
+  return { obj: out && typeof out === 'object' ? out : {}, error: '' };
 }
 
 function applyModify(text: string, jsonPath: Array<string | number>, value: any): string {
-  const original = text ?? ''
-  const trimmed = original.trim()
-  const format = { formattingOptions: { insertSpaces: true, tabSize: 2, eol: '\n' } }
+  const original = text ?? '';
+  const trimmed = original.trim();
+  const format = { formattingOptions: { insertSpaces: true, tabSize: 2, eol: '\n' } };
 
   const apply = (source: string) => {
-    const edits = modify(source, jsonPath, value, format)
-    return applyEdits(source, edits)
-  }
+    const edits = modify(source, jsonPath, value, format);
+    return applyEdits(source, edits);
+  };
   if (!trimmed) {
-    if (value === undefined) return original || '{\n}\n'
-    const base = typeof jsonPath[0] === 'number' ? '[\n]\n' : '{\n}\n'
-    return apply(base)
+    if (value === undefined) return original || '{\n}\n';
+    const base = typeof jsonPath[0] === 'number' ? '[\n]\n' : '{\n}\n';
+    return apply(base);
   }
 
   try {
-    return apply(original)
+    return apply(original);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
+    const msg = err instanceof Error ? err.message : String(err);
     if (value === undefined && /delete in empty document/i.test(msg)) {
-      return original
+      return original;
     }
-    throw err
+    throw err;
   }
 }
 
 function normalizeStringRecord(value: unknown): Record<string, string> | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
-  const out: Record<string, string> = {}
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-    const key = String(k ?? '').trim()
-    if (!key) continue
-    out[key] = typeof v === 'string' ? v : String(v ?? '')
+    const key = String(k ?? '').trim();
+    if (!key) continue;
+    out[key] = typeof v === 'string' ? v : String(v ?? '');
   }
-  return Object.keys(out).length > 0 ? out : undefined
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 function normalizeMcpConfig(value: unknown): McpServerConfig {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-  const obj = value as Record<string, unknown>
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const obj = value as Record<string, unknown>;
 
-  const out: McpServerConfig = {}
+  const out: McpServerConfig = {};
   if (obj.type === 'local' || obj.type === 'remote') {
-    out.type = obj.type
+    out.type = obj.type;
   }
 
-  if (typeof obj.enabled === 'boolean') out.enabled = obj.enabled
-  if (typeof obj.timeout === 'number' && Number.isFinite(obj.timeout)) out.timeout = obj.timeout
+  if (typeof obj.enabled === 'boolean') out.enabled = obj.enabled;
+  if (typeof obj.timeout === 'number' && Number.isFinite(obj.timeout)) out.timeout = obj.timeout;
 
   if (out.type === 'local') {
     const cmd = Array.isArray(obj.command)
       ? (obj.command as unknown[]).map((v: unknown) => String(v)).filter(Boolean)
-      : undefined
-    if (cmd && cmd.length > 0) out.command = cmd
-    const env = normalizeStringRecord(obj.environment)
-    if (env) out.environment = env
-    return out
+      : undefined;
+    if (cmd && cmd.length > 0) out.command = cmd;
+    const env = normalizeStringRecord(obj.environment);
+    if (env) out.environment = env;
+    return out;
   }
 
   if (out.type === 'remote') {
-    if (typeof obj.url === 'string') out.url = obj.url
-    const headers = normalizeStringRecord(obj.headers)
-    if (headers) out.headers = headers
+    if (typeof obj.url === 'string') out.url = obj.url;
+    const headers = normalizeStringRecord(obj.headers);
+    if (headers) out.headers = headers;
 
-    if (obj.oauth === false) out.oauth = false
+    if (obj.oauth === false) out.oauth = false;
     else if (obj.oauth && typeof obj.oauth === 'object' && !Array.isArray(obj.oauth)) {
-      const o = obj.oauth as Record<string, unknown>
-      const oauth: McpOAuthConfig = {}
-      if (typeof o.clientId === 'string') oauth.clientId = o.clientId
-      if (typeof o.clientSecret === 'string') oauth.clientSecret = o.clientSecret
-      if (typeof o.scope === 'string') oauth.scope = o.scope
-      out.oauth = oauth
+      const o = obj.oauth as Record<string, unknown>;
+      const oauth: McpOAuthConfig = {};
+      if (typeof o.clientId === 'string') oauth.clientId = o.clientId;
+      if (typeof o.clientSecret === 'string') oauth.clientSecret = o.clientSecret;
+      if (typeof o.scope === 'string') oauth.scope = o.scope;
+      out.oauth = oauth;
     }
 
-    return out
+    return out;
   }
 
   // toggle-only entry (e.g. { enabled: false })
-  return out
+  return out;
 }
 
 function isServerEnabled(config: McpServerConfig): boolean {
-  return config.enabled !== false
+  return config.enabled !== false;
 }
 
 async function loadConfig(opts?: { silent?: boolean }): Promise<void> {
-  if (state.loading) return
-  state.loading = true
-  if (!opts?.silent) state.error = ''
-  state.parseError = ''
+  if (state.loading) return;
+  state.loading = true;
+  if (!opts?.silent) state.error = '';
+  state.parseError = '';
 
   try {
-    const connection = await runtime.connectionManager.get()
-    const resp = await connection.getOpencodeConfigFile('opencode', configScope.value)
+    const connection = await runtime.connectionManager.get();
+    const resp = await connection.getOpencodeConfigFile('opencode', configScope.value);
     if (resp?.type !== 'get_opencode_config_file_response') {
-      throw new Error(`Unexpected response: ${String(resp?.type ?? resp)}`)
+      throw new Error(`Unexpected response: ${String(resp?.type ?? resp)}`);
     }
 
-    state.path = String(resp.path ?? '')
-    state.exists = !!resp.exists
-    state.sourceText = String(resp.content ?? '')
-    state.isLoaded = true
+    state.path = String(resp.path ?? '');
+    state.exists = !!resp.exists;
+    state.sourceText = String(resp.content ?? '');
+    state.isLoaded = true;
 
-    const { obj, error } = parseJsoncObject(state.sourceText)
-    state.parsed = obj
-    state.parseError = error
+    const { obj, error } = parseJsoncObject(state.sourceText);
+    state.parsed = obj;
+    state.parseError = error;
   } catch (err) {
-    state.error = err instanceof Error ? err.message : String(err)
+    state.error = err instanceof Error ? err.message : String(err);
   } finally {
-    state.loading = false
+    state.loading = false;
   }
 }
 
 function getServerType(config: McpServerConfig): string {
-  if (config.type === 'local') return 'local'
-  if (config.type === 'remote') return 'remote'
-  return 'toggle'
+  if (config.type === 'local') return 'local';
+  if (config.type === 'remote') return 'remote';
+  return 'toggle';
 }
 
 function editServer(name: string, serverConfig: McpServerConfig) {
-  isEditing.value = true
-  editingServerName.value = name
+  isEditing.value = true;
+  editingServerName.value = name;
 
-  const type = serverConfig.type === 'remote' ? 'remote' : 'local'
+  const type = serverConfig.type === 'remote' ? 'remote' : 'local';
   editingServer.value = {
     name,
     type,
     command: '',
     url: ''
-  }
+  };
 
-  argsText.value = ''
-  envText.value = ''
-  headersText.value = ''
+  argsText.value = '';
+  envText.value = '';
+  headersText.value = '';
 
   if (type === 'local') {
-    const cmd = serverConfig.command ?? []
-    editingServer.value.command = cmd[0] ?? ''
-    argsText.value = cmd.slice(1).join('\n')
-    envText.value = serverConfig.environment ? JSON.stringify(serverConfig.environment, null, 2) : ''
+    const cmd = serverConfig.command ?? [];
+    editingServer.value.command = cmd[0] ?? '';
+    argsText.value = cmd.slice(1).join('\n');
+    envText.value = serverConfig.environment
+      ? JSON.stringify(serverConfig.environment, null, 2)
+      : '';
   } else {
-    editingServer.value.url = serverConfig.url ?? ''
-    headersText.value = serverConfig.headers ? JSON.stringify(serverConfig.headers, null, 2) : ''
+    editingServer.value.url = serverConfig.url ?? '';
+    headersText.value = serverConfig.headers ? JSON.stringify(serverConfig.headers, null, 2) : '';
   }
 
-  showAddDialog.value = true
+  showAddDialog.value = true;
 }
 
 async function toggleServer(name: string, serverConfig: McpServerConfig) {
-  if (!name) return
+  if (!name) return;
   if (state.parseError) {
-    state.error = state.parseError
-    return
+    state.error = state.parseError;
+    return;
   }
 
-  let next = state.sourceText
-  next = applyModify(next, ['mcp', name, 'enabled'], !isServerEnabled(serverConfig))
-  await saveRawConfig(next)
+  let next = state.sourceText;
+  next = applyModify(next, ['mcp', name, 'enabled'], !isServerEnabled(serverConfig));
+  await saveRawConfig(next);
 }
 
 async function removeServer(name: string) {
-  if (!name) return
+  if (!name) return;
   if (state.parseError) {
-    state.error = state.parseError
-    return
+    state.error = state.parseError;
+    return;
   }
 
-  const ok = window.confirm(`确定删除 MCP 服务器 "${name}" 吗？`)
-  if (!ok) return
+  const ok = window.confirm(`确定删除 MCP 服务器 "${name}" 吗？`);
+  if (!ok) return;
 
-  let next = state.sourceText
-  next = applyModify(next, ['mcp', name], undefined)
-  await saveRawConfig(next)
+  let next = state.sourceText;
+  next = applyModify(next, ['mcp', name], undefined);
+  await saveRawConfig(next);
 }
 
 async function saveRawConfig(text: string): Promise<void> {
-  if (state.saving) return
-  if (!state.isLoaded) await loadConfig({ silent: true })
+  if (state.saving) return;
+  if (!state.isLoaded) await loadConfig({ silent: true });
   if (state.parseError) {
-    state.error = state.parseError
-    return
+    state.error = state.parseError;
+    return;
   }
 
-  state.saving = true
-  state.error = ''
+  state.saving = true;
+  state.error = '';
 
   try {
-    const connection = await runtime.connectionManager.get()
-    const resp = await connection.saveOpencodeConfigFile('opencode', text, configScope.value)
+    const connection = await runtime.connectionManager.get();
+    const resp = await connection.saveOpencodeConfigFile('opencode', text, configScope.value);
     if (resp?.type !== 'save_opencode_config_file_response') {
-      throw new Error(`Unexpected response: ${String(resp?.type ?? resp)}`)
+      throw new Error(`Unexpected response: ${String(resp?.type ?? resp)}`);
     }
-    if (!resp.success) throw new Error(String(resp.error ?? '保存失败'))
+    if (!resp.success) throw new Error(String(resp.error ?? '保存失败'));
 
-    if (typeof resp.path === 'string') state.path = resp.path
-    state.exists = true
-    state.sourceText = text
+    if (typeof resp.path === 'string') state.path = resp.path;
+    state.exists = true;
+    state.sourceText = text;
 
-    const { obj, error } = parseJsoncObject(state.sourceText)
-    state.parsed = obj
-    state.parseError = error
+    const { obj, error } = parseJsoncObject(state.sourceText);
+    state.parsed = obj;
+    state.parseError = error;
   } catch (err) {
-    state.error = err instanceof Error ? err.message : String(err)
+    state.error = err instanceof Error ? err.message : String(err);
   } finally {
-    state.saving = false
+    state.saving = false;
   }
 }
 
 async function setScope(scope: Scope): Promise<void> {
-  if (scope === configScope.value) return
+  if (scope === configScope.value) return;
   if (showAddDialog.value || showImportDialog.value) {
-    const ok = window.confirm('切换范围会关闭当前对话框，是否继续？')
-    if (!ok) return
-    closeDialog()
-    closeImportDialog()
+    const ok = window.confirm('切换范围会关闭当前对话框，是否继续？');
+    if (!ok) return;
+    closeDialog();
+    closeImportDialog();
   }
-  configScope.value = scope
-  await loadConfig({ silent: true })
+  configScope.value = scope;
+  await loadConfig({ silent: true });
 }
 
 function openAddDialog(): void {
-  state.error = ''
-  isEditing.value = false
-  editingServerName.value = ''
-  editingServer.value = { name: '', type: 'local', command: '', url: '' }
-  argsText.value = ''
-  envText.value = ''
-  headersText.value = ''
-  showAddDialog.value = true
+  state.error = '';
+  isEditing.value = false;
+  editingServerName.value = '';
+  editingServer.value = { name: '', type: 'local', command: '', url: '' };
+  argsText.value = '';
+  envText.value = '';
+  headersText.value = '';
+  showAddDialog.value = true;
 }
 
 function openImportDialog(): void {
-  importError.value = ''
-  importPreview.value = []
-  parsedServers.value = {}
-  importJsonText.value = ''
-  showImportDialog.value = true
+  importError.value = '';
+  importPreview.value = [];
+  parsedServers.value = {};
+  importJsonText.value = '';
+  showImportDialog.value = true;
 }
 
 function parseObjectJson(text: string): Record<string, string> | undefined {
-  const trimmed = String(text ?? '').trim()
-  if (!trimmed) return undefined
-  const parsed = JSON.parse(trimmed) as unknown
-  const normalized = normalizeStringRecord(parsed)
-  if (!normalized) throw new Error('JSON 必须是对象，例如 {\"KEY\": \"VALUE\"}')
-  return normalized
+  const trimmed = String(text ?? '').trim();
+  if (!trimmed) return undefined;
+  const parsed = JSON.parse(trimmed) as unknown;
+  const normalized = normalizeStringRecord(parsed);
+  if (!normalized) throw new Error('JSON 必须是对象，例如 {\"KEY\": \"VALUE\"}');
+  return normalized;
 }
 
 async function saveServer(): Promise<void> {
-  state.error = ''
+  state.error = '';
 
-  const name = String(editingServer.value.name ?? '').trim()
+  const name = String(editingServer.value.name ?? '').trim();
   if (!name) {
-    state.error = '请输入服务器名称'
-    return
+    state.error = '请输入服务器名称';
+    return;
   }
   if (state.parseError) {
-    state.error = state.parseError
-    return
+    state.error = state.parseError;
+    return;
   }
 
-  const originalName = isEditing.value ? String(editingServerName.value ?? '').trim() : ''
+  const originalName = isEditing.value ? String(editingServerName.value ?? '').trim() : '';
   const existingRaw =
-    originalName && state.parsed?.mcp && typeof state.parsed.mcp === 'object' && !Array.isArray(state.parsed.mcp)
+    originalName &&
+    state.parsed?.mcp &&
+    typeof state.parsed.mcp === 'object' &&
+    !Array.isArray(state.parsed.mcp)
       ? (state.parsed.mcp as Record<string, unknown>)[originalName]
-      : undefined
-  const existing = existingRaw ? normalizeMcpConfig(existingRaw) : undefined
-  const enabled = typeof existing?.enabled === 'boolean' ? existing.enabled : true
-  const timeout = typeof existing?.timeout === 'number' ? existing.timeout : undefined
+      : undefined;
+  const existing = existingRaw ? normalizeMcpConfig(existingRaw) : undefined;
+  const enabled = typeof existing?.enabled === 'boolean' ? existing.enabled : true;
+  const timeout = typeof existing?.timeout === 'number' ? existing.timeout : undefined;
 
   try {
-    let serverCfg: McpServerConfig
+    let serverCfg: McpServerConfig;
 
     if (editingServer.value.type === 'local') {
-      const cmd = String(editingServer.value.command ?? '').trim()
+      const cmd = String(editingServer.value.command ?? '').trim();
       if (!cmd) {
-        state.error = '请输入命令'
-        return
+        state.error = '请输入命令';
+        return;
       }
 
       const args = String(argsText.value ?? '')
         .split('\n')
         .map((s) => s.trim())
-        .filter(Boolean)
+        .filter(Boolean);
 
       serverCfg = {
         type: 'local',
         command: [cmd, ...args],
         enabled,
         environment: envText.value.trim() ? parseObjectJson(envText.value) : undefined
-      }
+      };
     } else {
-      const url = String(editingServer.value.url ?? '').trim()
+      const url = String(editingServer.value.url ?? '').trim();
       if (!url) {
-        state.error = '请输入 URL'
-        return
+        state.error = '请输入 URL';
+        return;
       }
 
       serverCfg = {
@@ -682,110 +681,117 @@ async function saveServer(): Promise<void> {
         url,
         enabled,
         headers: headersText.value.trim() ? parseObjectJson(headersText.value) : undefined
-      }
+      };
 
-      if (existing?.oauth !== undefined) serverCfg.oauth = existing.oauth
+      if (existing?.oauth !== undefined) serverCfg.oauth = existing.oauth;
     }
 
-    if (typeof timeout === 'number') serverCfg.timeout = timeout
+    if (typeof timeout === 'number') serverCfg.timeout = timeout;
 
-    let next = state.sourceText
+    let next = state.sourceText;
     if (originalName && originalName !== name) {
-      next = applyModify(next, ['mcp', originalName], undefined)
+      next = applyModify(next, ['mcp', originalName], undefined);
     }
-    next = applyModify(next, ['mcp', name], serverCfg)
+    next = applyModify(next, ['mcp', name], serverCfg);
 
-    await saveRawConfig(next)
-    if (!state.error) closeDialog()
+    await saveRawConfig(next);
+    if (!state.error) closeDialog();
   } catch (err) {
-    state.error = err instanceof Error ? err.message : String(err)
+    state.error = err instanceof Error ? err.message : String(err);
   }
 }
 
 function closeDialog(): void {
-  showAddDialog.value = false
-  isEditing.value = false
-  editingServerName.value = ''
-  editingServer.value = { name: '', type: 'local', command: '', url: '' }
-  argsText.value = ''
-  envText.value = ''
-  headersText.value = ''
+  showAddDialog.value = false;
+  isEditing.value = false;
+  editingServerName.value = '';
+  editingServer.value = { name: '', type: 'local', command: '', url: '' };
+  argsText.value = '';
+  envText.value = '';
+  headersText.value = '';
 }
 
 /**
  * 解析并预览 JSON 导入
  */
 function parseImportJson(): void {
-  importError.value = ''
-  importPreview.value = []
-  parsedServers.value = {}
+  importError.value = '';
+  importPreview.value = [];
+  parsedServers.value = {};
 
   try {
-    const json = JSON.parse(importJsonText.value) as any
+    const json = JSON.parse(importJsonText.value) as any;
 
-    let servers: Record<string, unknown> = {}
+    let servers: Record<string, unknown> = {};
     if (json && typeof json === 'object' && !Array.isArray(json)) {
-      if (json.mcp && typeof json.mcp === 'object' && !Array.isArray(json.mcp)) servers = json.mcp
-      else if (json.mcpServers && typeof json.mcpServers === 'object' && !Array.isArray(json.mcpServers)) {
-        servers = json.mcpServers
-      } else servers = json
+      if (json.mcp && typeof json.mcp === 'object' && !Array.isArray(json.mcp)) servers = json.mcp;
+      else if (
+        json.mcpServers &&
+        typeof json.mcpServers === 'object' &&
+        !Array.isArray(json.mcpServers)
+      ) {
+        servers = json.mcpServers;
+      } else servers = json;
     } else {
-      importError.value = '无效的 JSON 格式'
-      return
+      importError.value = '无效的 JSON 格式';
+      return;
     }
 
-    const validServers: Record<string, McpServerConfig> = {}
-    const serverNames: string[] = []
+    const validServers: Record<string, McpServerConfig> = {};
+    const serverNames: string[] = [];
 
     for (const [name, serverConfig] of Object.entries(servers)) {
-      const id = String(name ?? '').trim()
-      if (!id) continue
+      const id = String(name ?? '').trim();
+      if (!id) continue;
 
-      const converted = coerceImportServerConfig(serverConfig)
+      const converted = coerceImportServerConfig(serverConfig);
       if (!converted) {
-        importError.value = `服务器 "${id}" 配置格式错误`
-        return
+        importError.value = `服务器 "${id}" 配置格式错误`;
+        return;
       }
 
-      validServers[id] = converted
-      serverNames.push(id)
+      validServers[id] = converted;
+      serverNames.push(id);
     }
 
     if (serverNames.length === 0) {
-      importError.value = '未找到有效的服务器配置'
-      return
+      importError.value = '未找到有效的服务器配置';
+      return;
     }
 
-    parsedServers.value = validServers
-    importPreview.value = serverNames.sort((a, b) => a.localeCompare(b))
+    parsedServers.value = validServers;
+    importPreview.value = serverNames.sort((a, b) => a.localeCompare(b));
   } catch (error) {
-    importError.value = 'JSON 解析失败: ' + (error instanceof Error ? error.message : String(error))
+    importError.value =
+      'JSON 解析失败: ' + (error instanceof Error ? error.message : String(error));
   }
 }
 
 function coerceImportServerConfig(value: unknown): McpServerConfig | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
 
-  const obj = value as Record<string, unknown>
-  const enabledFromOld = obj.disabled === true ? false : typeof obj.enabled === 'boolean' ? obj.enabled : true
+  const obj = value as Record<string, unknown>;
+  const enabledFromOld =
+    obj.disabled === true ? false : typeof obj.enabled === 'boolean' ? obj.enabled : true;
 
   if (obj.type === 'local') {
     const cmd = Array.isArray(obj.command)
       ? (obj.command as unknown[]).map((v: unknown) => String(v)).filter(Boolean)
-      : undefined
-    if (!cmd || cmd.length === 0) return undefined
+      : undefined;
+    if (!cmd || cmd.length === 0) return undefined;
     return {
       type: 'local',
       command: cmd,
       enabled: typeof obj.enabled === 'boolean' ? obj.enabled : enabledFromOld,
       environment: normalizeStringRecord(obj.environment),
-      timeout: typeof obj.timeout === 'number' && Number.isFinite(obj.timeout) ? obj.timeout : undefined
-    }
+      timeout:
+        typeof obj.timeout === 'number' && Number.isFinite(obj.timeout) ? obj.timeout : undefined
+    };
   }
 
   if (obj.type === 'remote') {
-    const url = typeof obj.url === 'string' ? obj.url.trim() : ''
-    if (!url) return undefined
+    const url = typeof obj.url === 'string' ? obj.url.trim() : '';
+    if (!url) return undefined;
     return {
       type: 'remote',
       url,
@@ -797,62 +803,67 @@ function coerceImportServerConfig(value: unknown): McpServerConfig | undefined {
           : obj.oauth && typeof obj.oauth === 'object' && !Array.isArray(obj.oauth)
             ? (obj.oauth as McpOAuthConfig)
             : undefined,
-      timeout: typeof obj.timeout === 'number' && Number.isFinite(obj.timeout) ? obj.timeout : undefined
-    }
+      timeout:
+        typeof obj.timeout === 'number' && Number.isFinite(obj.timeout) ? obj.timeout : undefined
+    };
   }
 
   // 兼容旧 GUI 格式 (stdio/sse/http)
-  const legacyType = obj.type
+  const legacyType = obj.type;
   if (legacyType === 'stdio' || legacyType === undefined) {
-    const command = typeof obj.command === 'string' ? obj.command.trim() : ''
-    if (!command) return undefined
-    const args = Array.isArray(obj.args) ? (obj.args as unknown[]).map((v) => String(v)).filter(Boolean) : []
+    const command = typeof obj.command === 'string' ? obj.command.trim() : '';
+    if (!command) return undefined;
+    const args = Array.isArray(obj.args)
+      ? (obj.args as unknown[]).map((v) => String(v)).filter(Boolean)
+      : [];
     return {
       type: 'local',
       command: [command, ...args],
       enabled: enabledFromOld,
       environment: normalizeStringRecord(obj.env ?? obj.environment),
-      timeout: typeof obj.timeout === 'number' && Number.isFinite(obj.timeout) ? obj.timeout : undefined
-    }
+      timeout:
+        typeof obj.timeout === 'number' && Number.isFinite(obj.timeout) ? obj.timeout : undefined
+    };
   }
 
   if (legacyType === 'sse' || legacyType === 'http') {
-    const url = typeof obj.url === 'string' ? obj.url.trim() : ''
-    if (!url) return undefined
+    const url = typeof obj.url === 'string' ? obj.url.trim() : '';
+    if (!url) return undefined;
     return {
       type: 'remote',
       url,
       enabled: enabledFromOld,
       headers: normalizeStringRecord(obj.headers),
-      timeout: typeof obj.timeout === 'number' && Number.isFinite(obj.timeout) ? obj.timeout : undefined
-    }
+      timeout:
+        typeof obj.timeout === 'number' && Number.isFinite(obj.timeout) ? obj.timeout : undefined
+    };
   }
 
-  if (typeof obj.enabled === 'boolean') return { enabled: obj.enabled }
-  return undefined
+  if (typeof obj.enabled === 'boolean') return { enabled: obj.enabled };
+  return undefined;
 }
 
 /**
  * 执行导入
  */
 async function executeImport(): Promise<void> {
-  if (importPreview.value.length === 0) return
+  if (importPreview.value.length === 0) return;
   if (state.parseError) {
-    importError.value = state.parseError
-    return
+    importError.value = state.parseError;
+    return;
   }
 
   try {
-    let next = state.sourceText
+    let next = state.sourceText;
     for (const name of importPreview.value) {
-      const cfg = parsedServers.value[name]
-      if (!cfg) continue
-      next = applyModify(next, ['mcp', name], cfg)
+      const cfg = parsedServers.value[name];
+      if (!cfg) continue;
+      next = applyModify(next, ['mcp', name], cfg);
     }
-    await saveRawConfig(next)
-    if (!state.error) closeImportDialog()
+    await saveRawConfig(next);
+    if (!state.error) closeImportDialog();
   } catch (err) {
-    importError.value = err instanceof Error ? err.message : String(err)
+    importError.value = err instanceof Error ? err.message : String(err);
   }
 }
 
@@ -860,11 +871,11 @@ async function executeImport(): Promise<void> {
  * 关闭导入对话框
  */
 function closeImportDialog(): void {
-  showImportDialog.value = false
-  importJsonText.value = ''
-  importError.value = ''
-  importPreview.value = []
-  parsedServers.value = {}
+  showImportDialog.value = false;
+  importJsonText.value = '';
+  importError.value = '';
+  importPreview.value = [];
+  parsedServers.value = {};
 }
 </script>
 
@@ -1167,11 +1178,15 @@ function closeImportDialog(): void {
   -webkit-appearance: none;
   -moz-appearance: none;
   /* 添加自定义下拉箭头 - 使用 CSS 绘制三角形 */
-  background-image: linear-gradient(45deg, transparent 50%, var(--vscode-input-foreground) 50%),
-                    linear-gradient(135deg, var(--vscode-input-foreground) 50%, transparent 50%);
-  background-position: calc(100% - 16px) calc(50% - 2px),
-                       calc(100% - 12px) calc(50% - 2px);
-  background-size: 4px 4px, 4px 4px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--vscode-input-foreground) 50%),
+    linear-gradient(135deg, var(--vscode-input-foreground) 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) calc(50% - 2px),
+    calc(100% - 12px) calc(50% - 2px);
+  background-size:
+    4px 4px,
+    4px 4px;
   background-repeat: no-repeat;
   background-color: var(--vscode-input-background);
   padding-right: 32px;
@@ -1188,7 +1203,10 @@ function closeImportDialog(): void {
 }
 
 .form-select option:hover {
-  background-color: var(--vscode-list-hoverBackground, var(--vscode-inputOption-activeBackground)) !important;
+  background-color: var(
+    --vscode-list-hoverBackground,
+    var(--vscode-inputOption-activeBackground)
+  ) !important;
   color: var(--vscode-list-hoverForeground, var(--vscode-foreground)) !important;
 }
 
@@ -1251,7 +1269,10 @@ function closeImportDialog(): void {
   gap: 12px;
   padding: 16px;
   border-radius: 6px;
-  background: var(--vscode-textBlockQuote-background, var(--vscode-editor-inactiveSelectionBackground));
+  background: var(
+    --vscode-textBlockQuote-background,
+    var(--vscode-editor-inactiveSelectionBackground)
+  );
   border-left: 3px solid var(--vscode-notificationsInfoIcon-foreground);
 }
 
@@ -1382,6 +1403,9 @@ function closeImportDialog(): void {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
 }
 
 .scope-btn:hover {
@@ -1397,6 +1421,7 @@ function closeImportDialog(): void {
 
 .scope-btn .codicon {
   font-size: 16px;
+  flex-shrink: 0;
 }
 
 .scope-hint {
@@ -1404,5 +1429,15 @@ function closeImportDialog(): void {
   opacity: 0.7;
   font-weight: normal;
   font-family: var(--vscode-font-family);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+@media (max-width: 400px) {
+  .scope-hint {
+    display: none;
+  }
 }
 </style>

@@ -970,6 +970,11 @@ defineExpose({
 </script>
 
 <style scoped>
+/* 输入框容器样式覆盖 - 统一 padding */
+.full-input-box {
+  padding: 8px 8px 8px;
+}
+
 /* 输入框基础样式 - 固定行高以稳定 caret 定位 */
 .aislash-editor-input {
   line-height: 18px;
