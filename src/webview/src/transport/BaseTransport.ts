@@ -153,6 +153,9 @@ export abstract class BaseTransport {
   setOpencodeAuthApiKey(providerId: string, apiKey: string): Promise<any> {
     return this.sendRequest({ type: 'set_opencode_auth_api_key', providerId, apiKey });
   }
+  fetchProviderModels(providerId: string, baseURL: string, apiKey: string): Promise<any> {
+    return this.sendRequest({ type: 'fetch_provider_models', providerId, baseURL, apiKey });
+  }
   getMcpServers(channelId?: string): Promise<any> {
     return this.sendRequest({ type: 'get_mcp_servers' }, channelId);
   }

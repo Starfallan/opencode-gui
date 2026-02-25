@@ -675,6 +675,23 @@ export interface SetOpencodeAuthApiKeyResponse {
 }
 
 /**
+ * 从 Provider API 获取模型列表
+ */
+export interface FetchProviderModelsRequest {
+  type: 'fetch_provider_models';
+  providerId: string;
+  baseURL: string;
+  apiKey: string;
+}
+
+export interface FetchProviderModelsResponse {
+  type: 'fetch_provider_models_response';
+  providerId: string;
+  models: string[];
+  error?: string;
+}
+
+/**
  * 在终端打开 Claude
  */
 export interface OpenClaudeInTerminalRequest {
@@ -1021,6 +1038,7 @@ export type WebViewRequest =
   | SaveOpencodeConfigFileRequest
   | GetOpencodeAuthStatusRequest
   | SetOpencodeAuthApiKeyRequest
+  | FetchProviderModelsRequest
   | OpenClaudeInTerminalRequest
   | GetClaudeConfigRequest
   | SaveClaudeConfigRequest
@@ -1072,6 +1090,7 @@ export type WebViewRequestResponse =
   | SaveOpencodeConfigFileResponse
   | GetOpencodeAuthStatusResponse
   | SetOpencodeAuthApiKeyResponse
+  | FetchProviderModelsResponse
   | OpenClaudeInTerminalResponse
   | GetClaudeConfigResponse
   | SaveClaudeConfigResponse

@@ -43,7 +43,9 @@
 
     <div v-if="state.isLoaded && state.path" class="path-row">
       <span class="path-label">配置文件:</span>
-      <span class="path-value"><code>{{ state.path }}</code></span>
+      <span class="path-value"
+        ><code>{{ state.path }}</code></span
+      >
       <span v-if="!state.exists" class="badge badge-warn">未创建</span>
     </div>
 
@@ -185,8 +187,20 @@
                 <span>启用 promptCacheKey（用于 prompt cache）</span>
               </label>
               <div class="form-hint">
-                <code>provider.&lt;id&gt;.options.setCacheKey</code>：向 OpenAI-compatible provider 传递
-                <code>promptCacheKey=sessionID</code>，用于提升 prompt cache 命中（默认关闭）
+                <code>provider.&lt;id&gt;.options.setCacheKey</code>：向 OpenAI-compatible provider
+                传递 <code>promptCacheKey=sessionID</code>，用于提升 prompt cache 命中（默认关闭）
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">npm（可选）</label>
+              <input
+                v-model="dialog.npm"
+                class="form-input"
+                placeholder="@ai-sdk/openai-compatible"
+              />
+              <div class="form-hint">
+                <code>provider.&lt;id&gt;.provider.npm</code>：API SDK 包名
               </div>
             </div>
 
@@ -246,6 +260,37 @@
               </div>
             </div>
 
+            <div class="pill-row" style="margin-top: 8px">
+              <button
+                class="btn-action"
+                type="button"
+                :disabled="dialog.fetchingModels || !dialog.baseURL"
+                @click="fetchModelsFromProvider"
+              >
+                <span
+                  v-if="dialog.fetchingModels"
+                  class="codicon codicon-loading codicon-modifier-spin"
+                ></span>
+                <span v-else class="codicon codicon-cloud-download"></span>
+                从 API 获取模型
+              </button>
+              <button class="btn-action" type="button" @click="selectAllModels">全选</button>
+              <button class="btn-action" type="button" @click="clearModels">清空</button>
+              <button
+                class="btn-action"
+                type="button"
+                :disabled="dialog.modelIds.length === 0"
+                @click="addSelectedModelsToConfig"
+              >
+                <span class="codicon codicon-add"></span>
+                添加到模型配置
+              </button>
+            </div>
+
+            <div v-if="dialog.fetchModelsError" class="error-inline" style="margin-top: 8px">
+              {{ dialog.fetchModelsError }}
+            </div>
+
             <div v-if="filteredModelsForProvider.length > 0" class="model-grid">
               <label v-for="m in filteredModelsForProvider" :key="m" class="model-item">
                 <input
@@ -257,12 +302,11 @@
               </label>
             </div>
             <div v-else class="empty-hint">
-              未获取到该 provider 的模型列表（可先启动 OpenCode server 再重载）。
-            </div>
-
-            <div class="pill-row">
-              <button class="btn-action" type="button" @click="selectAllModels">全选</button>
-              <button class="btn-action" type="button" @click="clearModels">清空</button>
+              {{
+                dialog.fetchedModels.length > 0
+                  ? '从 API 获取的模型为空'
+                  : '未获取到该 provider 的模型列表（可点击"从 API 获取模型"按钮，或先启动 OpenCode server 再重载）'
+              }}
             </div>
           </div>
 
@@ -494,6 +538,7 @@ const dialog = reactive<{
   timeoutMode: 'default' | 'ms' | 'off';
   timeoutMs: string;
   setCacheKey: boolean;
+  npm: string;
   modelFilterMode: 'none' | 'whitelist' | 'blacklist';
   modelQuery: string;
   modelIds: string[];
@@ -505,6 +550,9 @@ const dialog = reactive<{
   authType: string;
   keyError: string;
   error: string;
+  fetchingModels: boolean;
+  fetchedModels: string[];
+  fetchModelsError: string;
 }>({
   open: false,
   mode: 'add',
@@ -515,6 +563,7 @@ const dialog = reactive<{
   timeoutMode: 'default',
   timeoutMs: '',
   setCacheKey: false,
+  npm: '',
   modelFilterMode: 'none',
   modelQuery: '',
   modelIds: [],
@@ -525,13 +574,23 @@ const dialog = reactive<{
   keyExists: false,
   authType: '',
   keyError: '',
-  error: ''
+  error: '',
+  fetchingModels: false,
+  fetchedModels: [],
+  fetchModelsError: ''
 });
 
 const filteredModelsForProvider = computed(() => {
   const providerId = String(dialog.providerId ?? '').trim();
   if (!providerId) return [];
-  const models = modelsByProvider.value.get(providerId) ?? [];
+
+  let models: string[] = [];
+
+  if (dialog.fetchedModels.length > 0) {
+    models = dialog.fetchedModels;
+  } else {
+    models = modelsByProvider.value.get(providerId) ?? [];
+  }
 
   const query = String(dialog.modelQuery ?? '')
     .trim()
@@ -556,6 +615,94 @@ function selectAllModels() {
 
 function clearModels() {
   dialog.modelIds = [];
+}
+
+function addSelectedModelsToConfig() {
+  const modelIds = dialog.modelIds || [];
+  for (const modelId of modelIds) {
+    const existing = dialog.customModels.find((m) => m.modelId === modelId);
+    if (!existing) {
+      dialog.customModels.push({
+        modelId,
+        name: '',
+        apiId: '',
+        sdkNpm: '@ai-sdk/openai-compatible',
+        context: '',
+        output: ''
+      });
+    }
+  }
+}
+
+async function fetchModelsFromProvider() {
+  const providerId = String(dialog.providerId ?? '').trim();
+  const baseURL = String(dialog.baseURL ?? '').trim();
+
+  if (!providerId || !baseURL) {
+    dialog.fetchModelsError = '请先填写 Provider ID 和 baseURL';
+    return;
+  }
+
+  dialog.fetchingModels = true;
+  dialog.fetchModelsError = '';
+  dialog.fetchedModels = [];
+
+  let apiKey = String(dialog.apiKeyInput ?? '').trim();
+
+  if (!apiKey) {
+    try {
+      const conn = await runtime!.connectionManager.get();
+      const authResp = await conn.getOpencodeAuthStatus(providerId);
+      if (
+        authResp?.type === 'get_opencode_auth_status_response' &&
+        authResp.exists &&
+        authResp.hasApiKey
+      ) {
+        const keyResp = await conn.setOpencodeAuthApiKey(providerId, '');
+        if (keyResp?.type === 'set_opencode_auth_api_key_response') {
+          const authPathResp = await conn.getOpencodeConfigFile('auth');
+          if (authPathResp?.type === 'get_opencode_config_file_response' && authPathResp.content) {
+            try {
+              const authData = JSON.parse(authPathResp.content);
+              const providerAuth = authData[providerId];
+              if (providerAuth?.key) {
+                apiKey = providerAuth.key;
+              }
+            } catch {
+              // ignore parse error
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore auth check error
+    }
+  }
+
+  if (!apiKey) {
+    dialog.fetchModelsError = '请先填写 API Key，或确保 auth.json 中已配置该 provider 的 Key';
+    dialog.fetchingModels = false;
+    return;
+  }
+
+  try {
+    const conn = await runtime!.connectionManager.get();
+    const resp = await conn.fetchProviderModels(providerId, baseURL, apiKey);
+    if (resp?.type !== 'fetch_provider_models_response') {
+      throw new Error(`Unexpected response: ${String(resp?.type ?? resp)}`);
+    }
+
+    if (resp.error) {
+      dialog.fetchModelsError = resp.error;
+      return;
+    }
+
+    dialog.fetchedModels = resp.models || [];
+  } catch (err) {
+    dialog.fetchModelsError = err instanceof Error ? err.message : String(err);
+  } finally {
+    dialog.fetchingModels = false;
+  }
 }
 
 function parseJsoncObject(text: string): { obj: any; error: string } {
@@ -702,6 +849,7 @@ function openAddDialog() {
   dialog.timeoutMode = 'default';
   dialog.timeoutMs = '';
   dialog.setCacheKey = false;
+  dialog.npm = '';
   dialog.modelFilterMode = 'none';
   dialog.modelQuery = '';
   dialog.modelIds = [];
@@ -713,6 +861,9 @@ function openAddDialog() {
   dialog.authType = '';
   dialog.keyError = '';
   dialog.error = '';
+  dialog.fetchingModels = false;
+  dialog.fetchedModels = [];
+  dialog.fetchModelsError = '';
 }
 
 async function refreshAuthStatus() {
@@ -757,6 +908,9 @@ async function openEditDialog(providerId: string) {
   dialog.keyError = '';
   dialog.error = '';
   dialog.modelQuery = '';
+  dialog.fetchingModels = false;
+  dialog.fetchedModels = [];
+  dialog.fetchModelsError = '';
 
   const cfg = state.parsed?.provider?.[id] ?? {};
   dialog.name = typeof cfg?.name === 'string' ? cfg.name : '';
@@ -775,6 +929,7 @@ async function openEditDialog(providerId: string) {
   }
 
   dialog.setCacheKey = cfg?.options?.setCacheKey === true;
+  dialog.npm = typeof cfg?.provider?.npm === 'string' ? cfg.provider.npm : '';
 
   const whitelist = asStringArray(cfg?.whitelist);
   const blacklist = asStringArray(cfg?.blacklist);
@@ -883,7 +1038,7 @@ function addCustomModel() {
     modelId: '',
     name: '',
     apiId: '',
-    sdkNpm: '',
+    sdkNpm: '@ai-sdk/openai-compatible',
     context: '',
     output: ''
   });
@@ -958,6 +1113,9 @@ async function saveProviderConfig() {
 
     const setCacheKey = dialog.setCacheKey === true ? true : undefined;
     next = applyModify(next, ['provider', providerId, 'options', 'setCacheKey'], setCacheKey);
+
+    const npm = String(dialog.npm ?? '').trim();
+    next = applyModify(next, ['provider', providerId, 'provider', 'npm'], npm || undefined);
 
     if (dialog.timeoutMode === 'off') {
       next = applyModify(next, ['provider', providerId, 'options', 'timeout'], false);

@@ -25,6 +25,7 @@ import type {
   SaveOpencodeConfigFileResponse,
   GetOpencodeAuthStatusResponse,
   SetOpencodeAuthApiKeyResponse,
+  FetchProviderModelsResponse,
   GetCurrentSelectionResponse,
   GetMcpServersResponse,
   GetAssetUrisResponse,
@@ -199,6 +200,8 @@ export async function dispatchRequest(
       return handleGetOpencodeAuthStatus(deps, req.providerId);
     case 'set_opencode_auth_api_key':
       return handleSetOpencodeAuthApiKey(deps, req.providerId, req.apiKey);
+    case 'fetch_provider_models':
+      return handleFetchProviderModels(deps, req.providerId, req.baseURL, req.apiKey);
 
     case 'get_current_selection':
       return handleGetCurrentSelection();
@@ -1157,6 +1160,92 @@ async function handleSetOpencodeAuthApiKey(
       success: false,
       error: msg
     };
+  }
+}
+
+async function handleFetchProviderModels(
+  deps: OpencodeAgentRequestsDeps,
+  providerId: string,
+  baseURL: string,
+  apiKey: string
+): Promise<FetchProviderModelsResponse> {
+  const id = String(providerId ?? '').trim();
+  const url = String(baseURL ?? '').trim();
+  const key = String(apiKey ?? '').trim();
+
+  if (!url) {
+    return {
+      type: 'fetch_provider_models_response',
+      providerId: id,
+      models: [],
+      error: 'baseURL is required'
+    };
+  }
+
+  if (!key) {
+    return {
+      type: 'fetch_provider_models_response',
+      providerId: id,
+      models: [],
+      error: 'API key is required'
+    };
+  }
+
+  try {
+    deps.logService.info(`[ProviderModels] Fetching models from ${url}`);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+
+    const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
+    const modelsUrl = `${baseUrl}/models`;
+
+    const response = await fetch(modelsUrl, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json'
+      },
+      signal: controller.signal
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return {
+        type: 'fetch_provider_models_response',
+        providerId: id,
+        models: [],
+        error: `HTTP ${response.status}: ${errorText}`
+      };
+    }
+
+    const data = (await response.json()) as any;
+    const models: string[] = [];
+
+    if (Array.isArray(data)) {
+      for (const item of data) {
+        if (item?.id) {
+          models.push(String(item.id));
+        }
+      }
+    } else if (data?.data && Array.isArray(data.data)) {
+      for (const item of data.data) {
+        if (item?.id) {
+          models.push(String(item.id));
+        }
+      }
+    }
+
+    models.sort((a, b) => a.localeCompare(b));
+    deps.logService.info(`[ProviderModels] Found ${models.length} models`);
+
+    return { type: 'fetch_provider_models_response', providerId: id, models };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    deps.logService.error(`[ProviderModels] Error: ${msg}`);
+    return { type: 'fetch_provider_models_response', providerId: id, models: [], error: msg };
   }
 }
 
