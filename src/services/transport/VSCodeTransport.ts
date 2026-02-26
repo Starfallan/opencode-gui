@@ -20,28 +20,29 @@ import { IWebViewService } from '../webViewService';
  * VSCode WebView Transport 实现
  */
 export class VSCodeTransport extends BaseTransport {
-    constructor(
-        @IWebViewService private readonly webViewService: IWebViewService,
-        @ILogService private readonly logService: ILogService
-    ) {
-        super();
-        this.logService.info('[VSCodeTransport] 已初始化');
-    }
+  constructor(
+    @IWebViewService private readonly webViewService: IWebViewService,
+    @ILogService private readonly logService: ILogService
+  ) {
+    super();
+    this.logService.info('[VSCodeTransport] 已初始化');
+  }
 
-    /**
-     * 发送消息到 WebView
-     */
-    send(message: any): void {
-        try {
-            // 只记录重要消息类型，过滤高频常规消息
-            const importantMessages = new Set(['close_channel', 'tool_permission_request']);
-            if (importantMessages.has(message.type)) {
-                this.logService.info(`[VSCodeTransport] 发送消息: ${message.type}`);
-            }
-            this.webViewService.postMessage(message);
-        } catch (error) {
-            this.logService.error('[VSCodeTransport] 发送消息失败:', error);
-        }
+  /**
+   * 发送消息到 WebView
+   */
+  send(message: any): void {
+    try {
+      // 只记录重要消息类型，过滤高频常规消息
+      const importantMessages = new Set(['close_channel', 'tool_permission_request', 'request']);
+      if (importantMessages.has(message.type)) {
+        this.logService.info(
+          `[VSCodeTransport] 发送消息: ${message.type}, requestType: ${message.request?.type}, channelId: ${message.channelId}`
+        );
+      }
+      this.webViewService.postMessage(message);
+    } catch (error) {
+      this.logService.error('[VSCodeTransport] 发送消息失败:', error);
     }
+  }
 }
-

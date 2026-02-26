@@ -91,14 +91,26 @@ export function useAgentManagement() {
   };
 
   const getAgentModelValue = (agentName: string): string | undefined => {
-    const agent = agents.value.find((a) => a.name === agentName);
-    if (agent?.model) {
-      return `${agent.model.providerID}/${agent.model.modelID}`;
+    // 优先用 ID 匹配，其次用 name 匹配
+    let agent = agents.value.find((a) => a.id === agentName);
+    if (!agent) {
+      agent = agents.value.find((a) => a.name === agentName);
     }
+    
+    console.log('[AgentManagement] getAgentModelValue:', agentName, 'found agent:', JSON.stringify(agent));
+    
+    if (agent?.model && agent.model.providerID && agent.model.modelID) {
+      const modelId = `${agent.model.providerID}/${agent.model.modelID}`;
+      console.log('[AgentManagement] Returning modelId:', modelId);
+      return modelId;
+    }
+    
+    console.log('[AgentManagement] No model found for agent, returning undefined');
     return undefined;
   };
 
   return {
+    agents,
     primaryAgents,
     allAgents,
     isInitialized: computed(() => isInitialized.value),

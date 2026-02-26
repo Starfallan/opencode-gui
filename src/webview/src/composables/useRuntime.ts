@@ -70,17 +70,24 @@ export function useRuntime(): RuntimeInstance {
 
     try {
       const response = await conn.getAgents();
+      console.log('[Runtime] getAgents raw response:', JSON.stringify(response));
       if (response?.agents && Array.isArray(response.agents)) {
         const agentInfos = response.agents.map((a: any) => ({
+          id: a.name, // 使用 name 作为 id
           name: a.name,
           description: a.description,
           mode:
             a.category?.toLowerCase() === 'primary' || a.category?.toLowerCase() === 'all'
               ? 'primary'
               : 'subagent',
-          model: a.model ? { providerID: '', modelID: a.model } : undefined,
+          model: a.model 
+            ? (typeof a.model === 'string' 
+                ? { providerID: '', modelID: a.model }
+                : { providerID: a.model.providerID || '', modelID: a.model.modelID || '' })
+            : undefined,
           hidden: a.hidden === true
         }));
+        console.log('[Runtime] agentInfos:', JSON.stringify(agentInfos.slice(0, 2)));
         initAgentsFromBackend(agentInfos);
         console.log('[Runtime] Initialized agents:', agentInfos.length);
       }

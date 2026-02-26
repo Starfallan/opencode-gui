@@ -73,6 +73,7 @@
       :disabled="isSubmitDisabled"
       :loading="isLoading"
       :primary-agent-mode="primaryAgentMode"
+      :selected-agent="selectedAgent"
       :selected-model="selectedModel"
       :available-variants="availableVariants"
       :selected-variant="selectedVariant"
@@ -189,6 +190,7 @@ interface Props {
   readonly?: boolean;
   showSearch?: boolean;
   primaryAgentMode?: 'build' | 'plan';
+  selectedAgent?: string;
   selectedModel?: string;
   availableVariants?: string[];
   selectedVariant?: string;

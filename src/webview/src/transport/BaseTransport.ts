@@ -324,6 +324,10 @@ export abstract class BaseTransport {
     return response ?? {};
   }
 
+  debugLog(level: string, message: string): void {
+    this.sendRequest({ type: 'debug-log', level, message });
+  }
+
   listFiles(pattern?: string): Promise<any> {
     return this.sendRequest({ type: 'list_files_request', pattern });
   }
@@ -450,6 +454,11 @@ export abstract class BaseTransport {
             break;
           }
           case 'request':
+            console.log(
+              '[BaseTransport] Received request message:',
+              message.type,
+              (message as any).request?.type
+            );
             await this.processRequest(message as RequestMessage);
             break;
           case 'response': {

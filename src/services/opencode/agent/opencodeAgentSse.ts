@@ -91,6 +91,11 @@ function flushStreamBuffer(deps: SseDeps, state: ChannelState): void {
 }
 
 export type SseDeps = {
+  logService?: {
+    info: (msg: string, ...args: any[]) => void;
+    warn: (msg: string, ...args: any[]) => void;
+    error: (msg: string, ...args: any[]) => void;
+  };
   modelContextWindowById: Map<string, number>;
   requestWaiters: Map<
     string,
@@ -462,7 +467,11 @@ function onSessionStatus(deps: SseDeps, state: ChannelState, evt: OpencodeEvent)
   deps.sendToChannel(state.channelId, { type: 'result', timestamp: Date.now() });
 }
 
-async function onSessionError(deps: SseDeps, state: ChannelState, evt: OpencodeEvent): Promise<void> {
+async function onSessionError(
+  deps: SseDeps,
+  state: ChannelState,
+  evt: OpencodeEvent
+): Promise<void> {
   const sessionID = (evt.properties as any)?.sessionID as string | undefined;
   if (sessionID && sessionID !== state.sessionId) return;
 
@@ -471,7 +480,9 @@ async function onSessionError(deps: SseDeps, state: ChannelState, evt: OpencodeE
   const msgText = String(msg);
 
   if (deps.tryRecoverUnsupportedFilePartError) {
-    const recovered = await deps.tryRecoverUnsupportedFilePartError(state, msgText).catch(() => false);
+    const recovered = await deps
+      .tryRecoverUnsupportedFilePartError(state, msgText)
+      .catch(() => false);
     if (recovered) return;
   }
 

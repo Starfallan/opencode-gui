@@ -6,6 +6,7 @@
         <!-- Mode Select -->
         <ModeSelect
           :primary-agent-mode="primaryAgentMode"
+          :selected-agent="selectedAgent"
           @primary-agent-select="
             (mode, modelValue) => emit('primary-agent-select', mode, modelValue)
           "
@@ -194,6 +195,7 @@ interface Props {
   disabled?: boolean;
   loading?: boolean;
   primaryAgentMode?: string;
+  selectedAgent?: string;
   selectedModel?: string;
   availableVariants?: string[];
   selectedVariant?: string;

@@ -108,6 +108,7 @@
           :conversation-working="isBusy"
           :attachments="attachments"
           :primary-agent-mode="primaryAgentMode"
+          :selected-agent="currentAgentId"
           :selected-model="session?.modelSelection.value"
           :available-variants="availableVariants"
           :selected-variant="currentVariant"
@@ -311,6 +312,27 @@ const primaryAgentMode = computed<'build' | 'plan'>(() => {
   const mode = String(session.value?.permissionMode.value ?? '').trim();
   return mode === 'plan' ? 'plan' : 'build';
 });
+
+// 当前选中的 agent（用于 ModeSelect 显示）
+const currentAgentId = ref<string | undefined>(undefined);
+
+// 获取已保存的 agent 并初始化
+const initSavedAgent = async () => {
+  const conn = runtime?.connectionManager?.connection();
+  if (conn?.getSavedAgent) {
+    try {
+      const saved = await conn.getSavedAgent();
+      if (saved?.agentName) {
+        currentAgentId.value = saved.agentName;
+      }
+    } catch (e) {
+      console.warn('[ChatPage] Failed to get saved agent:', e);
+    }
+  }
+};
+
+// 页面加载时初始化
+initSavedAgent();
 
 // Compute variants for the currently selected model
 const { availableModels } = useModelManagement();
@@ -630,13 +652,49 @@ async function handleVariantSelect(variant: string) {
 }
 
 async function handlePrimaryAgentSelect(mode: string, modelValue?: string) {
+  const conn = runtime?.connectionManager?.connection();
+  
+  // 更新当前选中的 agent
+  currentAgentId.value = mode;
+  
+  // 保存选中的 agent
+  if (conn?.saveSelectedAgent) {
+    try {
+      await conn.saveSelectedAgent(mode);
+    } catch (e) {
+      console.warn('[ChatPage] Failed to save selected agent:', e);
+    }
+  }
+  
+  // 如果 modelValue 无效，获取已保存的 model 或使用默认
+  let finalModelId = modelValue;
+  if (!finalModelId || finalModelId.includes('[object')) {
+    try {
+      const saved = await conn?.getSavedModel?.();
+      if (saved?.modelId && !saved.modelId.includes('[object')) {
+        finalModelId = saved.modelId;
+        (conn as any)?.debugLog?.('debug', `ChatPage: Using saved model: ${finalModelId}`);
+      }
+    } catch (e) {
+      (conn as any)?.debugLog?.('debug', `ChatPage: Failed to get saved model: ${e}`);
+    }
+  }
+  
+  // 如果仍然没有 model，使用默认兜底
+  if (!finalModelId) {
+    finalModelId = 'opencode/big-pickle';
+    (conn as any)?.debugLog?.('debug', `ChatPage: Using default fallback model: ${finalModelId}`);
+  }
+  
+  (conn as any)?.debugLog?.('debug', `ChatPage handlePrimaryAgentSelect: mode=${mode}, finalModelId=${finalModelId}`);
+  
   const s = session.value;
   if (!s) return;
 
   await s.setPermissionMode(mode === 'plan' ? 'plan' : 'default');
 
-  if (modelValue) {
-    await handleModelSelect(modelValue);
+  if (finalModelId) {
+    await handleModelSelect(finalModelId);
   }
 }
 

@@ -55,8 +55,12 @@ export interface PrimaryAgentModeConfig {
 
 const runtime = inject(RuntimeKey);
 
-const { primaryAgents: fetchedPrimaryAgents, isInitialized: agentsInitialized } =
-  useAgentManagement();
+const {
+  agents,
+  primaryAgents: fetchedPrimaryAgents,
+  isInitialized: agentsInitialized,
+  getAgentModelValue
+} = useAgentManagement();
 
 const fallbackModes: PrimaryAgentModeConfig[] = [
   {
@@ -75,6 +79,7 @@ const fallbackModes: PrimaryAgentModeConfig[] = [
 
 interface Props {
   primaryAgentMode?: PrimaryAgentMode;
+  selectedAgent?: string;
 }
 
 interface Emits {
@@ -87,7 +92,12 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<Emits>();
 
+// 当前选中的 agent：优先使用 props.selectedAgent，否则使用 primaryAgentMode
 const effectivePrimaryAgentMode = computed<string>(() => {
+  // 如果传入了 selectedAgent，使用它
+  if (props.selectedAgent) {
+    return props.selectedAgent;
+  }
   return props.primaryAgentMode ?? 'build';
 });
 
@@ -112,34 +122,36 @@ const currentModeConfig = computed(() => {
   );
 });
 
-function getAgentModelValue(agentName: string): string | undefined {
-  const { getAgentModelValue: getModelValue } = useAgentManagement();
-  return getModelValue(agentName);
-}
-
 function handlePrimaryAgentSelect(mode: string, close: () => void) {
+  const conn = runtime?.connectionManager?.connection() as unknown as Connection | undefined;
+  conn?.debugLog?.('debug', `=== ModeSelect START === mode=${mode}`);
+  
+  let modelValue: string | undefined;
+  try {
+    modelValue = getAgentModelValue(mode);
+    conn?.debugLog?.('debug', `=== modelValue=${JSON.stringify(modelValue)}, agents=${JSON.stringify(agents.value.map(a => ({id: a.id, name: a.name})))}`);
+  } catch (e: any) {
+    conn?.debugLog?.('error', `=== getAgentModelValue ERROR: ${e?.message || e}`);
+  }
+  
   close();
-
-  const modelValue = getAgentModelValue(mode);
+  conn?.debugLog?.('debug', `=== EMITTING primary-agent-select mode=${mode} modelValue=${JSON.stringify(modelValue)}`);
   emit('primary-agent-select', mode, modelValue);
-
+}
+onMounted(async () => {
+  // Debug: log initialization state
   if (runtime?.connectionManager) {
     const conn = runtime.connectionManager.connection() as unknown as Connection;
-    if (conn?.saveSelectedAgent) {
-      conn.saveSelectedAgent(mode).catch((e) => {
-        console.warn('[ModeSelect] Failed to save selected agent:', e);
-      });
-    }
+    conn.debugLog?.('debug', `ModeSelect onMounted: agentsInitialized=${agentsInitialized.value}, hasConnection=${!!conn}`);
   }
-}
-
-onMounted(async () => {
+  
   if (!runtime?.connectionManager || agentsInitialized.value) return;
 
   const conn = runtime.connectionManager.connection() as unknown as Connection;
   if (conn?.getSavedAgent) {
     try {
       const saved = await conn.getSavedAgent();
+      conn.debugLog?.('debug', `ModeSelect getSavedAgent: ${JSON.stringify(saved)}`);
       if (saved?.agentName) {
         emit('primary-agent-select', saved.agentName, getAgentModelValue(saved.agentName));
       }

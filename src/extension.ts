@@ -147,6 +147,8 @@ export function activate(context: vscode.ExtensionContext) {
       // 处理保存选中的 model 请求
       if (message.type === 'request' && message.request?.type === 'save-selected-model') {
         const modelId = message.request.modelId as string;
+        logService.info(`[Extension] save-selected-model request: ${JSON.stringify(message.request)}`);
+        logService.info(`[Extension] modelId value: ${modelId}, type: ${typeof modelId}`);
         await context.workspaceState.update('opencodeGui.selectedModel', modelId);
         logService.info(`[Extension] Saved selected model: ${modelId}`);
         webViewService.postMessage({
@@ -166,6 +168,19 @@ export function activate(context: vscode.ExtensionContext) {
           requestId: message.requestId,
           response: { type: 'get-saved-model_response', modelId: savedModel }
         });
+        return;
+      }
+
+      // Debug log handler
+      if (message.type === 'request' && message.request?.type === 'debug-log') {
+        const { level, message: debugMsg } = message.request as { level: string; message: string };
+        if (level === 'error') {
+          logService.error(`[WebView] ${debugMsg}`);
+        } else if (level === 'warn') {
+          logService.warn(`[WebView] ${debugMsg}`);
+        } else {
+          logService.info(`[WebView] ${debugMsg}`);
+        }
         return;
       }
 
