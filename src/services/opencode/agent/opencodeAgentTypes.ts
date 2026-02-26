@@ -63,6 +63,19 @@ export type OpenCodePermission = {
   time?: { created: number };
 };
 
+export type OpenCodeQuestion = {
+  id: string;
+  sessionID: string;
+  messageID?: string;
+  type: 'question';
+  header: string;
+  question: string;
+  options: Array<{
+    label: string;
+    description?: string;
+  }>;
+};
+
 export type ChannelState = {
   channelId: string;
   cwd: string;

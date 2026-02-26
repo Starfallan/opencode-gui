@@ -205,7 +205,8 @@ export class OpencodeAgentService implements IOpencodeAgentService {
       sessionId,
       modelSetting: typeof model === 'string' ? model.trim() || undefined : undefined,
       variant: typeof variant === 'string' ? variant.trim() || undefined : undefined,
-      permissionMode: typeof permissionMode === 'string' ? permissionMode.trim() || undefined : undefined,
+      permissionMode:
+        typeof permissionMode === 'string' ? permissionMode.trim() || undefined : undefined,
       activeAgent: this.mapPrimaryAgentFromPermissionMode(permissionMode),
       running: false,
       sseAbort: new AbortController(),
@@ -343,7 +344,10 @@ export class OpencodeAgentService implements IOpencodeAgentService {
     }
   }
 
-  private async tryRecoverUnsupportedFilePartError(state: ChannelState, message: string): Promise<boolean> {
+  private async tryRecoverUnsupportedFilePartError(
+    state: ChannelState,
+    message: string
+  ): Promise<boolean> {
     const parsed = parseUnsupportedFilePartError(message);
     if (!parsed) return false;
 
@@ -410,7 +414,9 @@ export class OpencodeAgentService implements IOpencodeAgentService {
 
   private async removeFilePartsByMime(state: ChannelState, mime: string): Promise<number> {
     const messages = await this.client.listMessages(state.sessionId, state.cwd);
-    const items: any[] = Array.isArray(messages) ? messages : (messages?.messages ?? messages?.data ?? []);
+    const items: any[] = Array.isArray(messages)
+      ? messages
+      : (messages?.messages ?? messages?.data ?? []);
 
     const targetMime = normalizeMimeType(mime);
     let removed = 0;
@@ -477,7 +483,10 @@ export class OpencodeAgentService implements IOpencodeAgentService {
           this.sendToChannel(state.channelId, {
             type: 'assistant',
             timestamp: Date.now(),
-            message: { role: 'assistant', content: [{ type: 'text', text: 'SSE 连接断开，正在重连...' }] }
+            message: {
+              role: 'assistant',
+              content: [{ type: 'text', text: 'SSE 连接断开，正在重连...' }]
+            }
           });
         }
         await sleep(delayMs);
@@ -496,7 +505,10 @@ export class OpencodeAgentService implements IOpencodeAgentService {
           this.sendToChannel(state.channelId, {
             type: 'assistant',
             timestamp: Date.now(),
-            message: { role: 'assistant', content: [{ type: 'text', text: 'SSE 连接失败，正在重连...' }] }
+            message: {
+              role: 'assistant',
+              content: [{ type: 'text', text: 'SSE 连接失败，正在重连...' }]
+            }
           });
         }
 
@@ -586,10 +598,14 @@ export class OpencodeAgentService implements IOpencodeAgentService {
       if (!statusMap || !Array.isArray(children)) return false;
 
       for (const child of children) {
-        const id = String((child as any)?.id ?? (child as any)?.sessionID ?? (child as any)?.sessionId ?? '').trim();
+        const id = String(
+          (child as any)?.id ?? (child as any)?.sessionID ?? (child as any)?.sessionId ?? ''
+        ).trim();
         if (!id) continue;
         const st = statusMap[id];
-        const t = String((st as any)?.type ?? '').trim().toLowerCase();
+        const t = String((st as any)?.type ?? '')
+          .trim()
+          .toLowerCase();
         if (t === 'busy' || t === 'retry') {
           return true;
         }
@@ -615,10 +631,16 @@ export class OpencodeAgentService implements IOpencodeAgentService {
 
   private getSseDeps(): SseDeps {
     return {
+      logService: {
+        info: (msg: string, ...args: any[]) => this.logService.info(msg, ...args),
+        warn: (msg: string, ...args: any[]) => this.logService.warn(msg, ...args),
+        error: (msg: string, ...args: any[]) => this.logService.error(msg, ...args)
+      },
       modelContextWindowById: this.modelContextWindowById,
       requestWaiters: this.requestWaiters,
       transportSend: (msg) => this.transport?.send(msg),
-      pushProgressEvent: (channelId, type, summary) => this.pushProgressEvent(channelId, type, summary),
+      pushProgressEvent: (channelId, type, summary) =>
+        this.pushProgressEvent(channelId, type, summary),
       sendToChannel: (channelId, event) => this.sendToChannel(channelId, event),
       tryRecoverUnsupportedFilePartError: async (state, message) => {
         return await this.tryRecoverUnsupportedFilePartError(state, message);
@@ -630,6 +652,23 @@ export class OpencodeAgentService implements IOpencodeAgentService {
       upsertDelta: upsertDeltaImpl,
       respondPermission: async (sessionId, permissionId, response, cwd, remember) => {
         await this.client.respondPermission(sessionId, permissionId, response, cwd, remember);
+      },
+      getQuestionConfig: () => {
+        const enabled =
+          this.configService.getValue<boolean>('opencodeGui.questionAutoResponse', true) ?? true;
+        const countdownSeconds =
+          this.configService.getValue<number>('opencodeGui.questionCountdownSeconds', 60) ?? 60;
+        const autoSelectKeyword =
+          this.configService.getValue<string>(
+            'opencodeGui.questionAutoSelectKeyword',
+            '推荐,recommend'
+          ) ?? '推荐,recommend';
+        const noKeywordAction =
+          this.configService.getValue<'first' | 'wait'>(
+            'opencodeGui.questionNoKeywordAction',
+            'first'
+          ) ?? 'first';
+        return { enabled, countdownSeconds, autoSelectKeyword, noKeywordAction };
       }
     };
   }
@@ -639,7 +678,8 @@ export class OpencodeAgentService implements IOpencodeAgentService {
       logService: this.logService,
       configService: this.configService,
       client: this.client,
-      pushProgressEvent: (channelId, type, summary) => this.pushProgressEvent(channelId, type, summary),
+      pushProgressEvent: (channelId, type, summary) =>
+        this.pushProgressEvent(channelId, type, summary),
       sendToChannel: (channelId, event) => this.sendToChannel(channelId, event),
       getEffectiveAgentName: (state) => this.getEffectiveAgentName(state)
     };
@@ -695,13 +735,14 @@ export class OpencodeAgentService implements IOpencodeAgentService {
     }
   }
 
-
   private pushProgressEvent(channelId: string, type: string, summary: string): void {
     pushProgressEventImpl(this.progressEventsByChannel, channelId, type, summary);
   }
 
   private mapPrimaryAgentFromPermissionMode(mode: unknown): string | undefined {
-    const value = String(mode ?? '').trim().toLowerCase();
+    const value = String(mode ?? '')
+      .trim()
+      .toLowerCase();
     return value === 'plan' ? 'plan' : 'build';
   }
 
@@ -716,7 +757,9 @@ export class OpencodeAgentService implements IOpencodeAgentService {
 
   private getEffectiveModelSetting(state?: ChannelState): string | undefined {
     const modelSetting = (
-      state?.modelSetting ?? (this.configService.getValue<string>('opencodeGui.selectedModel', '') ?? '')
+      state?.modelSetting ??
+      this.configService.getValue<string>('opencodeGui.selectedModel', '') ??
+      ''
     ).trim();
     return modelSetting || undefined;
   }
@@ -750,12 +793,16 @@ export class OpencodeAgentService implements IOpencodeAgentService {
     if (this.channels.size > 0) return;
     if (!this.serverService.isManaged()) return;
 
-    this.logService.info(`[OpencodeAgentService] No active channels; stopping server after idle ${idleMs}ms`);
+    this.logService.info(
+      `[OpencodeAgentService] No active channels; stopping server after idle ${idleMs}ms`
+    );
 
     try {
       await this.client.disposeAllInstances();
     } catch (error) {
-      this.logService.warn(`[OpencodeAgentService] global.dispose failed (ignored): ${String(error)}`);
+      this.logService.warn(
+        `[OpencodeAgentService] global.dispose failed (ignored): ${String(error)}`
+      );
     }
 
     if (this.channels.size > 0) return;
@@ -763,7 +810,9 @@ export class OpencodeAgentService implements IOpencodeAgentService {
     try {
       this.serverService.dispose();
     } catch (error) {
-      this.logService.warn(`[OpencodeAgentService] server dispose failed (ignored): ${String(error)}`);
+      this.logService.warn(
+        `[OpencodeAgentService] server dispose failed (ignored): ${String(error)}`
+      );
     }
   }
 
@@ -804,6 +853,8 @@ function parseUnsupportedFilePartError(message: string): { mime: string } | unde
 }
 
 function normalizeMimeType(value: unknown): string {
-  const raw = String(value ?? '').trim().toLowerCase();
+  const raw = String(value ?? '')
+    .trim()
+    .toLowerCase();
   return raw || 'application/octet-stream';
 }

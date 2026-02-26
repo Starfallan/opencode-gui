@@ -59,6 +59,30 @@
           "type": "number",
           "default": 0,
           "description": "Stop the local OpenCode server after all channels are closed and idle for this long (ms). Only affects servers auto-started by this extension. Set to 0 to disable."
+        },
+        "opencodeGui.questionAutoResponse": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable automatic response to question prompts with countdown"
+        },
+        "opencodeGui.questionCountdownSeconds": {
+          "type": "number",
+          "default": 60,
+          "description": "Countdown seconds before auto-selecting an option (default: 60)"
+        },
+        "opencodeGui.questionAutoSelectKeyword": {
+          "type": "string",
+          "default": "推荐,recommend",
+          "description": "Comma-separated keywords to auto-select option. If no match, select first option."
+        },
+        "opencodeGui.questionNoKeywordAction": {
+          "type": "string",
+          "default": "first",
+          "enum": [
+            "first",
+            "wait"
+          ],
+          "description": "Action when no keyword match: 'first' = select first option, 'wait' = wait for user"
         }
       }
     },

@@ -150,6 +150,57 @@
       :context="toolContext"
       :on-resolve="handleResolvePermission"
     />
+
+    <!-- Question 问答模态框 -->
+    <Teleport to="body">
+      <Transition name="dialog-fade">
+        <div v-if="pendingQuestion" class="question-overlay" @click.self="pendingQuestion = null">
+          <div class="question-container">
+            <!-- 问题标签页 -->
+            <div v-if="pendingQuestion.questions.length > 1" class="question-tabs">
+              <button
+                v-for="(q, idx) in pendingQuestion.questions"
+                :key="idx"
+                class="question-tab"
+                :class="{ active: questionTabIndex === idx, answered: questionTabIndex > idx }"
+                :disabled="questionTabIndex !== idx"
+                @click="questionTabIndex = idx"
+              >
+                {{ q.header }}
+              </button>
+            </div>
+
+            <div class="question-header">
+              <span class="codicon codicon-question"></span>
+              <span class="question-title">{{ currentQuestion?.header }}</span>
+            </div>
+            <div class="question-body">
+              <p class="question-text">{{ currentQuestion?.question }}</p>
+              <div class="question-options">
+                <button
+                  v-for="(opt, idx) in currentQuestion?.options || []"
+                  :key="idx"
+                  class="question-option"
+                  @click="resolveQuestion(opt.label)"
+                >
+                  <span class="option-label">{{ opt.label }}</span>
+                  <span v-if="opt.description" class="option-desc">{{ opt.description }}</span>
+                </button>
+              </div>
+            </div>
+            <div
+              v-if="pendingQuestion.config.enabled && questionCountdown > 0"
+              class="question-footer"
+            >
+              <span class="countdown">自动选择: {{ questionCountdown }}s</span>
+              <span class="countdown-hint">
+                关键字: {{ pendingQuestion.config.autoSelectKeyword || '无' }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -170,6 +221,7 @@ import MessageRenderer from '../components/Messages/MessageRenderer.vue';
 import PermissionRequestModal from '../components/PermissionRequestModal.vue';
 import ProgressDialog from '../components/ProgressDialog.vue';
 import ModelManagementDialog from '../components/ModelManagementDialog.vue';
+import ConfirmDialog from '../components/ConfirmDialog.vue';
 import { useKeybinding } from '../utils/useKeybinding';
 import { useSignal } from '@gn8/alien-signals-vue';
 
@@ -425,6 +477,107 @@ const permissionRequestsLen = computed(() => permissionRequests.value.length);
 const pendingPermission = computed(() => permissionRequests.value[0] as any);
 const platform = computed(() => runtime.appContext.platform);
 
+// Question dialog state
+const questionDialogRef = ref<InstanceType<typeof ConfirmDialog> | null>(null);
+const pendingQuestion = ref<{
+  questionId: string;
+  questions: Array<{
+    header: string;
+    question: string;
+    options: Array<{ label: string; description?: string }>;
+    multiple?: boolean;
+  }>;
+  config: {
+    enabled: boolean;
+    countdownSeconds: number;
+    autoSelectKeyword: string;
+    noKeywordAction: 'first' | 'wait';
+  };
+  resolve: (label: string) => void;
+} | null>(null);
+const questionCountdown = ref(0);
+const questionTabIndex = ref(0);
+const questionAnswered = ref<string[]>([]);
+let questionCountdownTimer: ReturnType<typeof setInterval> | null = null;
+
+const currentQuestion = computed(() => {
+  const q = pendingQuestion.value;
+  if (!q || !q.questions || q.questions.length === 0) return null;
+  return q.questions[questionTabIndex.value] || q.questions[0];
+});
+
+function showQuestionDialog(question: typeof pendingQuestion.value) {
+  if (!question) return;
+  console.log('[ChatPage] showQuestionDialog called with:', JSON.stringify(question).slice(0, 800));
+  pendingQuestion.value = question;
+  questionTabIndex.value = 0;
+  questionAnswered.value = [];
+
+  if (question.config.enabled && question.config.countdownSeconds > 0) {
+    questionCountdown.value = question.config.countdownSeconds;
+    questionCountdownTimer = setInterval(() => {
+      questionCountdown.value--;
+      if (questionCountdown.value <= 0) {
+        if (questionCountdownTimer) {
+          clearInterval(questionCountdownTimer);
+          questionCountdownTimer = null;
+        }
+        autoSelectQuestionOption();
+      }
+    }, 1000);
+  }
+}
+
+function autoSelectQuestionOption() {
+  const q = pendingQuestion.value;
+  if (!q) return;
+
+  const keywords = q.config.autoSelectKeyword
+    .split(',')
+    .map((k) => k.trim().toLowerCase())
+    .filter(Boolean);
+
+  const currentQ = currentQuestion.value;
+  const options = currentQ?.options || [];
+
+  let selectedLabel = '';
+
+  if (keywords.length > 0 && options.length > 0) {
+    for (const opt of options) {
+      const labelLower = opt.label.toLowerCase();
+      if (keywords.some((kw) => labelLower.includes(kw))) {
+        selectedLabel = opt.label;
+        break;
+      }
+    }
+  }
+
+  if (!selectedLabel) {
+    if (q.config.noKeywordAction === 'first' && options.length > 0) {
+      selectedLabel = options[0].label;
+    } else if (q.config.noKeywordAction === 'wait') {
+      return;
+    }
+  }
+
+  if (selectedLabel) {
+    resolveQuestion(selectedLabel);
+  }
+}
+
+function resolveQuestion(label: string) {
+  if (questionCountdownTimer) {
+    clearInterval(questionCountdownTimer);
+    questionCountdownTimer = null;
+  }
+  const q = pendingQuestion.value;
+  if (q) {
+    q.resolve(label);
+  }
+  pendingQuestion.value = null;
+  questionCountdown.value = 0;
+}
+
 // 估算 Token 使用占比（基于 usageData）
 const progressPercentage = computed(() => {
   const s = session.value;
@@ -529,6 +682,13 @@ watch(permissionRequestsLen, async () => {
 });
 
 onMounted(async () => {
+  // Register question handler
+  console.log('[ChatPage] Registering question handler');
+  runtime.connectionManager.connection()?.onQuestionRequested?.((question) => {
+    console.log('[ChatPage] Question received:', JSON.stringify(question).slice(0, 500));
+    showQuestionDialog(question);
+  });
+
   disposeLocalModelCommand = runtime.appContext.commandRegistry.registerAction(
     {
       id: 'opencode-gui.ui.model.choose',
@@ -1102,5 +1262,155 @@ async function handleSendQueuedMessageNow(id: string) {
 
 .show-all-btn:hover {
   background: var(--vscode-button-hoverBackground);
+}
+
+.question-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.question-container {
+  background: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 8px;
+  width: min(600px, 90vw);
+  max-height: 80vh;
+  overflow: auto;
+}
+
+.question-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  padding: 8px 16px 0;
+  gap: 4px;
+}
+
+.question-tab {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.question-tab:hover:not(:disabled) {
+  color: var(--vscode-editor-foreground);
+}
+
+.question-tab.active {
+  color: var(--vscode-editor-foreground);
+  border-bottom-color: var(--vscode-focusBorder);
+}
+
+.question-tab.answered {
+  color: var(--vscode-editor-foreground);
+}
+
+.question-tab:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.question-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.question-header .codicon {
+  font-size: 20px;
+  color: var(--vscode-editor-foreground);
+}
+
+.question-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--vscode-editor-foreground);
+}
+
+.question-body {
+  padding: 16px;
+}
+
+.question-text {
+  margin: 0 0 16px 0;
+  font-size: 13px;
+  color: var(--vscode-editor-foreground);
+  line-height: 1.5;
+}
+
+.question-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.question-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 6px;
+  background: var(--vscode-editor-background);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+}
+
+.question-option:hover {
+  border-color: var(--vscode-focusBorder);
+  background: var(--vscode-list-hoverBackground);
+}
+
+.option-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--vscode-editor-foreground);
+}
+
+.option-desc {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.question-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-top: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-editor-inactiveSelectionBackground);
+}
+
+.countdown {
+  font-size: 12px;
+  color: var(--vscode-errorForeground);
+  font-weight: 600;
+}
+
+.countdown-hint {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.dialog-fade-enter-active,
+.dialog-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.dialog-fade-enter-from,
+.dialog-fade-leave-to {
+  opacity: 0;
 }
 </style>

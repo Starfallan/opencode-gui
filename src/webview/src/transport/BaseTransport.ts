@@ -60,6 +60,23 @@ export abstract class BaseTransport {
   readonly permissionRequested: EventEmitter<PermissionRequest> =
     new EventEmitter<PermissionRequest>();
 
+  readonly questionRequested: EventEmitter<{
+    questionId: string;
+    questions: Array<{
+      header: string;
+      question: string;
+      options: Array<{ label: string; description?: string }>;
+      multiple?: boolean;
+    }>;
+    config: {
+      enabled: boolean;
+      countdownSeconds: number;
+      autoSelectKeyword: string;
+      noKeywordAction: 'first' | 'wait';
+    };
+    resolve: (label: string) => void;
+  }> = new EventEmitter();
+
   protected readonly fromHost = new AsyncQueue<ExtensionToWebViewMessage>();
   protected readonly streams = new Map<string, AsyncQueue<any>>();
   protected readonly outstandingRequests = new Map<string, RequestHandler>();
@@ -375,6 +392,27 @@ export abstract class BaseTransport {
     this.permissionRequested.add(callback);
   }
 
+  onQuestionRequested(
+    callback: (request: {
+      questionId: string;
+      questions: Array<{
+        header: string;
+        question: string;
+        options: Array<{ label: string; description?: string }>;
+        multiple?: boolean;
+      }>;
+      config: {
+        enabled: boolean;
+        countdownSeconds: number;
+        autoSelectKeyword: string;
+        noKeywordAction: 'first' | 'wait';
+      };
+      resolve: (label: string) => void;
+    }) => void
+  ): void {
+    this.questionRequested.add(callback);
+  }
+
   close(): void {
     /* no-op */
   }
@@ -501,12 +539,23 @@ export abstract class BaseTransport {
 
   private async processRequest(message: RequestMessage): Promise<void> {
     const req: any = (message as any).request;
+    console.log(
+      '[BaseTransport] processRequest received:',
+      req?.type,
+      'requestId:',
+      message.requestId
+    );
     switch (req.type) {
       case 'tool_permission_request': {
         const response = await this.handleToolPermissionRequest(
           (message.channelId ?? '') as string,
           req as ToolPermissionRequest
         );
+        this.send({ type: 'response', requestId: message.requestId, response });
+        break;
+      }
+      case 'question_request': {
+        const response = await this.handleQuestionRequest((message.channelId ?? '') as string, req);
         this.send({ type: 'response', requestId: message.requestId, response });
         break;
       }
@@ -564,6 +613,40 @@ export abstract class BaseTransport {
       if (trackedRequest) {
         this.permissionRequests(this.permissionRequests().filter((i) => i !== trackedRequest));
       }
+    });
+  }
+
+  private handleQuestionRequest(
+    channelId: string,
+    request: {
+      questionId: string;
+      questions: Array<{
+        header: string;
+        question: string;
+        options: Array<{ label: string; description?: string }>;
+        multiple?: boolean;
+      }>;
+      config: {
+        enabled: boolean;
+        countdownSeconds: number;
+        autoSelectKeyword: string;
+        noKeywordAction: 'first' | 'wait';
+      };
+    }
+  ): Promise<{ type: string; questionId: string; label: string }> {
+    console.log(
+      '[BaseTransport] handleQuestionRequest called:',
+      JSON.stringify(request).slice(0, 500)
+    );
+    return new Promise<{ type: string; questionId: string; label: string }>((resolve) => {
+      this.questionRequested.emit({
+        questionId: request.questionId,
+        questions: request.questions,
+        config: request.config,
+        resolve: (label: string) => {
+          resolve({ type: 'question_response', questionId: request.questionId, label });
+        }
+      });
     });
   }
 }

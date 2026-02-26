@@ -123,6 +123,12 @@ export type SseDeps = {
     cwd: string,
     remember?: boolean
   ) => Promise<void>;
+  getQuestionConfig: () => {
+    enabled: boolean;
+    countdownSeconds: number;
+    autoSelectKeyword: string;
+    noKeywordAction: 'first' | 'wait';
+  };
 };
 
 export async function handleEvent(
@@ -148,6 +154,9 @@ export async function handleEvent(
       return;
     case 'session.error':
       await onSessionError(deps, state, evt);
+      return;
+    case 'question.asked':
+      await onQuestionUpdated(deps, state, evt);
       return;
     default:
       return;
@@ -517,4 +526,81 @@ export function flushPendingAssistantOutput(deps: SseDeps, state: ChannelState):
   flushStreamBuffer(deps, state);
   state.reasoningParts.clear();
   state.textParts.clear();
+}
+
+async function onQuestionUpdated(
+  deps: SseDeps,
+  state: ChannelState,
+  evt: OpencodeEvent
+): Promise<void> {
+  const requestID = evt.properties?.id as string | undefined;
+  const sessionID = evt.properties?.sessionID as string | undefined;
+  const questions = evt.properties?.questions as any[] | undefined;
+
+  deps.logService?.info(
+    '[SSE] question data - requestID:',
+    requestID,
+    'sessionID:',
+    sessionID,
+    'questions count:',
+    questions?.length,
+    'state.sessionId:',
+    state.sessionId
+  );
+
+  if (!requestID || !sessionID || sessionID !== state.sessionId || !questions) {
+    deps.logService?.warn('[SSE] question skipped - missing data or session mismatch');
+    return;
+  }
+
+  deps.logService?.info(
+    '[SSE] Processing question, questions:',
+    JSON.stringify(questions).slice(0, 500)
+  );
+
+  const questionConfig = deps.getQuestionConfig();
+
+  const requestId = Math.random().toString(36).slice(2);
+
+  const responsePromise = new Promise<{ label: string }>((resolve, reject) => {
+    deps.requestWaiters.set(requestId, { resolve: resolve as any, reject });
+  });
+
+  deps.transportSend({
+    type: 'request',
+    channelId: state.channelId,
+    requestId,
+    request: {
+      type: 'question_request',
+      questionId: requestID,
+      questions: questions,
+      config: questionConfig
+    }
+  });
+
+  deps.logService?.info(
+    '[SSE] question_request sent to webview, questionId:',
+    requestID,
+    'questions count:',
+    questions.length
+  );
+
+  const resp = await responsePromise;
+  const selectedLabel = resp?.label || '';
+
+  deps.sendToChannel(state.channelId, {
+    type: 'user',
+    timestamp: Date.now(),
+    message: {
+      role: 'user',
+      content: [
+        {
+          type: 'tool_result',
+          tool_use_id: `question_${requestID}`,
+          content: selectedLabel,
+          is_error: false
+        }
+      ]
+    }
+  });
 }

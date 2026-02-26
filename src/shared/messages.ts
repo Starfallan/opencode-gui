@@ -283,6 +283,32 @@ export interface ApplyOpencodeConfigResponse {
   error?: string;
 }
 
+export interface QuestionRequest {
+  type: 'question_request';
+  questionId: string;
+  questions: Array<{
+    header: string;
+    question: string;
+    options: Array<{
+      label: string;
+      description?: string;
+    }>;
+    multiple?: boolean;
+  }>;
+  config: {
+    enabled: boolean;
+    countdownSeconds: number;
+    autoSelectKeyword: string;
+    noKeywordAction: 'first' | 'wait';
+  };
+}
+
+export interface QuestionResponse {
+  type: 'question_response';
+  questionId: string;
+  label: string;
+}
+
 /**
  * 获取 MCP 服务器
  */
@@ -1049,7 +1075,8 @@ export type WebViewRequest =
   | ToggleSkillRequest
   | DeleteSkillRequest
   | GetProgressRequest
-  | ApplyOpencodeConfigRequest;
+  | ApplyOpencodeConfigRequest
+  | QuestionRequest;
 
 /**
  * Extension → WebView 的所有响应类型
@@ -1101,7 +1128,8 @@ export type WebViewRequestResponse =
   | ToggleSkillResponse
   | DeleteSkillResponse
   | GetProgressResponse
-  | ApplyOpencodeConfigResponse;
+  | ApplyOpencodeConfigResponse
+  | QuestionResponse;
 
 /**
  * Extension → WebView 的所有请求类型
