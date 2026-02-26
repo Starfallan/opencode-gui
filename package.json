@@ -83,6 +83,14 @@
             "wait"
           ],
           "description": "Action when no keyword match: 'first' = select first option, 'wait' = wait for user"
+        },
+        "opencodeGui.serverCustomArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": ["--log-level=DEBUG", "--print-logs"],
+          "description": "Custom arguments for opencode serve command (excluding serve, hostname, port)"
         }
       }
     },

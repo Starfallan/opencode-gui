@@ -240,7 +240,9 @@ export class OpencodeServerService implements IOpencodeServerService {
       this.logService.info(`[OpencodeServerService] Using executable: ${spawnCommand}`);
       
       // 添加 serve 命令和参数
-      const serveArgs = ["serve", `--hostname=${hostname}`, `--port=${port}`];
+      const customArgs = this.configService.getValue<string[]>("opencodeGui.serverCustomArgs", []) ?? [];
+      
+      const serveArgs = ["serve", `--hostname=${hostname}`, `--port=${port}`, ...customArgs];
       if (spawnArgs.length > 0) {
         spawnArgs = spawnArgs.concat(serveArgs);
         this.logService.info(`[OpencodeServerService] With arguments: ${spawnArgs.join(' ')}`);
@@ -270,6 +272,21 @@ export class OpencodeServerService implements IOpencodeServerService {
       }
       
       this.logService.info(`[OpencodeServerService] Spawned process pid=${proc.pid ?? "unknown"}`);
+
+      // 将 opencode stdout/stderr 重定向到 VSCode Output 面板
+      proc.stdout.on('data', (data: Buffer) => {
+        const lines = data.toString().split('\n').filter((l: string) => l.trim());
+        for (const line of lines) {
+          this.logOpenCodeLine(line);
+        }
+      });
+
+      proc.stderr.on('data', (data: Buffer) => {
+        const lines = data.toString().split('\n').filter((l: string) => l.trim());
+        for (const line of lines) {
+          this.logOpenCodeLine(line);
+        }
+      });
 
       try {
         const listeningUrl = await this.waitForListeningUrl(proc);
@@ -424,5 +441,47 @@ export class OpencodeServerService implements IOpencodeServerService {
       await new Promise((r) => setTimeout(r, 200));
     }
     return false;
+  }
+
+  private logOpenCodeLine(line: string): void {
+    // 格式: LEVEL timestamp +Xms message
+    // 示例: INFO  2026-02-26T07:13:06 +51ms service=plugin
+    
+    let level = 'INFO ';
+    let message = line;
+    
+    // 提取级别 (前5个字符, 如 INFO , WARN , ERROR)
+    if (line.length >= 5) {
+      const potentialLevel = line.substring(0, 5).toUpperCase();
+      if (potentialLevel.startsWith('INFO') || potentialLevel.startsWith('WARN') || 
+          potentialLevel.startsWith('ERRO') || potentialLevel.startsWith('DEBUG') || 
+          potentialLevel.startsWith('TRACE')) {
+        level = potentialLevel.padEnd(5, ' ');
+        
+        // 查找 +Xms 位置 (相对时间开始)
+        const plusIndex = line.indexOf('+');
+        if (plusIndex > 0) {
+          // 提取 +Xms 及其后的消息
+          message = line.substring(plusIndex);
+        }
+      }
+    }
+
+    switch (level.trim()) {
+      case 'ERROR':
+        this.logService.error(`[OpenCode] ${message}`);
+        break;
+      case 'WARN':
+        this.logService.warn(`[OpenCode] ${message}`);
+        break;
+      case 'DEBUG':
+        this.logService.debug(`[OpenCode] ${message}`);
+        break;
+      case 'TRACE':
+        this.logService.trace(`[OpenCode] ${message}`);
+        break;
+      default:
+        this.logService.info(`[OpenCode] ${message}`);
+    }
   }
 }
