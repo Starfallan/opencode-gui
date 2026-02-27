@@ -102,7 +102,7 @@ export type SseDeps = {
     { resolve: (value: unknown) => void; reject: (error: Error) => void }
   >;
   transportSend: (msg: any) => void;
-  pushProgressEvent: (channelId: string, type: string, summary: string) => void;
+  pushProgressEvent: (channelId: string, type: string, summary: string, status?: string) => void;
   sendToChannel: (channelId: string, event: any) => void;
   tryRecoverUnsupportedFilePartError?: (state: ChannelState, message: string) => Promise<boolean>;
   getEffectiveModelSetting: (state?: ChannelState) => string | undefined;
@@ -307,7 +307,8 @@ function onToolPart(deps: SseDeps, state: ChannelState, part: OpenCodeToolPart):
     deps.pushProgressEvent(
       state.channelId,
       'tool',
-      title ? `${String(part.tool ?? 'tool')} — ${title}` : String(part.tool ?? 'tool')
+      title ? `${String(part.tool ?? 'tool')} — ${title}` : String(part.tool ?? 'tool'),
+      status
     );
     deps.sendToChannel(state.channelId, {
       type: 'assistant',
@@ -451,7 +452,7 @@ function onSessionIdle(deps: SseDeps, state: ChannelState, evt: OpencodeEvent): 
   }
 
   state.running = false;
-  deps.pushProgressEvent(state.channelId, 'session', 'idle');
+  deps.pushProgressEvent(state.channelId, 'session', 'idle', 'idle');
   flushPendingAssistantOutput(deps, state);
   deps.sendToChannel(state.channelId, { type: 'result', timestamp: Date.now() });
 }
@@ -471,7 +472,7 @@ function onSessionStatus(deps: SseDeps, state: ChannelState, evt: OpencodeEvent)
   }
 
   state.running = false;
-  deps.pushProgressEvent(state.channelId, 'session', 'idle');
+  deps.pushProgressEvent(state.channelId, 'session', 'idle', 'idle');
   flushPendingAssistantOutput(deps, state);
   deps.sendToChannel(state.channelId, { type: 'result', timestamp: Date.now() });
 }
@@ -498,7 +499,7 @@ async function onSessionError(
   const wasRunning = state.running;
   if (wasRunning) {
     state.running = false;
-    deps.pushProgressEvent(state.channelId, 'session', 'error');
+    deps.pushProgressEvent(state.channelId, 'session', 'error', 'error');
     flushPendingAssistantOutput(deps, state);
   }
 

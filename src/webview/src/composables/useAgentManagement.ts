@@ -81,7 +81,35 @@ export function useAgentManagement() {
     }
 
     console.log('[AgentManagement] Initializing agents:', backendAgents.length);
-    agents.value = backendAgents;
+
+    // Deduplicate agents: prefer longer/descriptive names (e.g., "Sisyphus (Ultraworker)" over "sisyphus")
+    const deduplicatedMap = new Map<string, AgentInfo>();
+    for (const agent of backendAgents) {
+      const name = agent.name;
+      if (!name) continue;
+
+      // Check if we already have this agent (by normalized key)
+      const normalizedKey = name.toLowerCase().replace(/[\s\-]/g, '');
+      const existing = deduplicatedMap.get(normalizedKey);
+
+      if (!existing) {
+        deduplicatedMap.set(normalizedKey, agent);
+      } else {
+        // Prefer longer name (more descriptive) over shorter one
+        if (name.length > existing.name.length) {
+          deduplicatedMap.set(normalizedKey, agent);
+        }
+      }
+    }
+
+    const deduplicatedAgents = Array.from(deduplicatedMap.values());
+    console.log(
+      '[AgentManagement] Deduplicated agents:',
+      deduplicatedAgents.length,
+      'from',
+      backendAgents.length
+    );
+    agents.value = deduplicatedAgents;
     isInitialized.value = true;
   };
 
@@ -91,20 +119,22 @@ export function useAgentManagement() {
   };
 
   const getAgentModelValue = (agentName: string): string | undefined => {
-    // 优先用 ID 匹配，其次用 name 匹配
-    let agent = agents.value.find((a) => a.id === agentName);
-    if (!agent) {
-      agent = agents.value.find((a) => a.name === agentName);
-    }
-    
-    console.log('[AgentManagement] getAgentModelValue:', agentName, 'found agent:', JSON.stringify(agent));
-    
+    // Use name to match since AgentInfo only has name field
+    const agent = agents.value.find((a) => a.name === agentName);
+
+    console.log(
+      '[AgentManagement] getAgentModelValue:',
+      agentName,
+      'found agent:',
+      JSON.stringify(agent)
+    );
+
     if (agent?.model && agent.model.providerID && agent.model.modelID) {
       const modelId = `${agent.model.providerID}/${agent.model.modelID}`;
       console.log('[AgentManagement] Returning modelId:', modelId);
       return modelId;
     }
-    
+
     console.log('[AgentManagement] No model found for agent, returning undefined');
     return undefined;
   };

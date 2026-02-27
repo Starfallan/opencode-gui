@@ -1,16 +1,37 @@
 import type { ChannelState } from './opencodeAgentTypes';
 import type { GetProgressResponse } from '../../../shared/messages';
 
+export interface ProgressEvent {
+  ts: number;
+  type: string;
+  summary: string;
+  status?: string;
+}
+
 export function pushProgressEvent(
-  progressEventsByChannel: Map<string, Array<{ ts: number; type: string; summary: string }>>,
+  progressEventsByChannel: Map<string, ProgressEvent[]>,
   channelId: string,
   type: string,
-  summary: string
+  summary: string,
+  status?: string
 ): void {
   const trimmed = String(summary ?? '').trim();
   if (!trimmed) return;
+  
   const arr = progressEventsByChannel.get(channelId) ?? [];
-  arr.push({ ts: Date.now(), type, summary: trimmed });
+  
+  // 对于 tool 类型，尝试更新现有事件而不是新增
+  if (type === 'tool' && status) {
+    const existingIndex = arr.findIndex(e => e.type === 'tool' && e.summary === trimmed);
+    if (existingIndex >= 0) {
+      arr[existingIndex].status = status;
+      arr[existingIndex].ts = Date.now();
+      progressEventsByChannel.set(channelId, arr);
+      return;
+    }
+  }
+  
+  arr.push({ ts: Date.now(), type, summary: trimmed, status });
   const MAX = 50;
   if (arr.length > MAX) {
     arr.splice(0, arr.length - MAX);
