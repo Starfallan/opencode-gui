@@ -1,13 +1,14 @@
-import * as vscode from "vscode";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import * as net from "node:net";
-import * as path from "node:path";
-import * as fs from "node:fs/promises";
-import { createDecorator } from "../../di/instantiation";
-import { ILogService } from "../logService";
-import { IConfigurationService } from "../configurationService";
+import * as vscode from 'vscode';
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import * as net from 'node:net';
+import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
+import { createDecorator } from '../../di/instantiation';
+import { ILogService } from '../logService';
+import { IConfigurationService } from '../configurationService';
 
-export const IOpencodeServerService = createDecorator<IOpencodeServerService>("opencodeServerService");
+export const IOpencodeServerService =
+  createDecorator<IOpencodeServerService>('opencodeServerService');
 
 export interface IOpencodeServerService {
   readonly _serviceBrand: undefined;
@@ -51,7 +52,7 @@ export class OpencodeServerService implements IOpencodeServerService {
       this.activeConfigFingerprint !== currentFingerprint
     ) {
       this.logService.info(
-        "[OpencodeServerService] Detected OpenCode server setting changes; restarting server binding"
+        '[OpencodeServerService] Detected OpenCode server setting changes; restarting server binding'
       );
       this.dispose();
     }
@@ -77,10 +78,12 @@ export class OpencodeServerService implements IOpencodeServerService {
 
     try {
       if (proc) {
-        // Best-effort: on Windows, kill the full process tree (opencode may spawn MCP servers).
-        if (pid && process.platform === "win32") {
+        if (pid && process.platform === 'win32') {
           try {
-            spawn("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
+            spawn('taskkill', ['/PID', String(pid), '/T', '/F'], {
+              stdio: 'ignore',
+              windowsHide: true
+            });
           } catch (error) {
             this.logService.warn(
               `[OpencodeServerService] taskkill failed; falling back to proc.kill(): ${String(error)}`
@@ -92,7 +95,9 @@ export class OpencodeServerService implements IOpencodeServerService {
         }
       }
     } catch (error) {
-      this.logService.warn(`[OpencodeServerService] Failed to kill server process: ${String(error)}`);
+      this.logService.warn(
+        `[OpencodeServerService] Failed to kill server process: ${String(error)}`
+      );
     } finally {
       this.proc = undefined;
       this.baseUrl = undefined;
@@ -105,42 +110,95 @@ export class OpencodeServerService implements IOpencodeServerService {
     const configuredBaseUrl = this.getConfiguredBaseUrl();
     const configFingerprint = this.getConfigFingerprint(configuredBaseUrl);
 
-    // 1) 如果用户显式配置了非本地地址：只尝试连接，不自动拉起
+    // 1) If user configured non-local address
     if (!this.isLocalBaseUrl(configuredBaseUrl)) {
       this.baseUrl = configuredBaseUrl;
       this.activeConfigFingerprint = configFingerprint;
       return configuredBaseUrl;
     }
 
-    // 2) 先探测本地 server 是否已经存在
-    if (await this.checkHealth(configuredBaseUrl)) {
-      this.logService.info(`[OpencodeServerService] Using existing server: ${configuredBaseUrl}`);
-      this.baseUrl = configuredBaseUrl;
-      this.activeConfigFingerprint = configFingerprint;
-      return configuredBaseUrl;
+    const url = new URL(configuredBaseUrl);
+    const port = parseInt(url.port) || 4096;
+    const host = url.hostname || '127.0.0.1';
+
+    // 2) Check if port is in use
+    const portInUse = await this.isPortAvailable(host, port);
+
+    if (!portInUse) {
+      this.logService.info(
+        `[OpencodeServerService] Port ${port} is in use, checking for existing OpenCode server...`
+      );
+
+      // Try to connect to existing server
+      if (await this.checkHealth(configuredBaseUrl, 5000)) {
+        this.logService.info(
+          `[OpencodeServerService] Reusing existing OpenCode server: ${configuredBaseUrl}`
+        );
+        this.baseUrl = configuredBaseUrl;
+        this.activeConfigFingerprint = configFingerprint;
+        return configuredBaseUrl;
+      }
+
+      // Port is occupied but not responding - show non-modal notification
+      const choice = await vscode.window.showWarningMessage(
+        `端口 ${port} 已被占用，可能是之前的 OpenCode 进程未正常关闭。`,
+        {
+          detail:
+            '请选择操作:\n\n1. 强制杀死进程并重启（推荐）\n2. 等待并重连（如果进程正在启动中）'
+        },
+        '强制杀死并重启',
+        '等待并重连'
+      );
+
+      if (choice === '强制杀死并重启') {
+        await this.killProcessOnPort(host, port);
+        this.logService.info(
+          `[OpencodeServerService] Killed process on port ${port}, proceeding with fresh start`
+        );
+      } else {
+        this.logService.info(
+          `[OpencodeServerService] Waiting for existing server to become ready...`
+        );
+        const waitOk = await this.waitUntilHealthy(configuredBaseUrl, 60000);
+        if (waitOk) {
+          this.logService.info(
+            `[OpencodeServerService] Existing server became ready: ${configuredBaseUrl}`
+          );
+          this.baseUrl = configuredBaseUrl;
+          this.activeConfigFingerprint = configFingerprint;
+          return configuredBaseUrl;
+        }
+
+        this.logService.warn(
+          `[OpencodeServerService] Existing server still not responding, killing and restarting...`
+        );
+        await this.killProcessOnPort(host, port);
+      }
     }
 
-    // 3) 启动本地 server
-    const { url, proc } = await this.startLocalServer(configuredBaseUrl);
+    // 3) Start local server
+    const { url: serverUrl, proc } = await this.startLocalServer(configuredBaseUrl);
     this.proc = proc;
-    this.baseUrl = url;
+    this.baseUrl = serverUrl;
     this.activeConfigFingerprint = configFingerprint;
-    return url;
+    return serverUrl;
   }
 
   private getConfiguredBaseUrl(): string {
     return (
-      this.configService.getValue<string>("opencodeGui.serverBaseUrl", "http://127.0.0.1:4096") ??
-      "http://127.0.0.1:4096"
+      this.configService.getValue<string>('opencodeGui.serverBaseUrl', 'http://127.0.0.1:4096') ??
+      'http://127.0.0.1:4096'
     );
   }
 
   private getConfigFingerprint(configuredBaseUrl?: string): string {
     const baseUrl = String(configuredBaseUrl ?? this.getConfiguredBaseUrl()).trim();
     const opencodePath = String(
-      this.configService.getValue<string>("opencodeGui.opencodePath", "opencode") ?? "opencode"
+      this.configService.getValue<string>('opencodeGui.opencodePath', 'opencode') ?? 'opencode'
     ).trim();
-    const configDir = String(this.configService.getValue<string>("opencodeGui.configDir", "") ?? "").trim();
+    const configDir = String(
+      this.configService.getValue<string>('opencodeGui.configDir', '') ?? ''
+    ).trim();
     return JSON.stringify({ baseUrl, opencodePath, configDir });
   }
 
@@ -148,67 +206,73 @@ export class OpencodeServerService implements IOpencodeServerService {
     try {
       const url = new URL(baseUrl);
       const host = url.hostname;
-      return host === "127.0.0.1" || host === "localhost";
+      return host === '127.0.0.1' || host === 'localhost';
     } catch {
       return false;
     }
   }
 
-  private async checkHealth(baseUrl: string): Promise<boolean> {
+  private async checkHealth(baseUrl: string, timeoutMs: number = 3000): Promise<boolean> {
     try {
-      // OpenCode server health endpoint (per upstream server docs)
-      // GET /global/health -> { healthy: true, version: string }
-      const url = new URL("/global/health", baseUrl).toString();
-      const res = await fetch(url, { method: "GET" });
-      return res.ok;
+      const url = new URL(baseUrl);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+      try {
+        const res = await fetch(url.toString(), {
+          method: 'HEAD',
+          signal: controller.signal
+        });
+        return res.ok || res.status === 405;
+      } finally {
+        clearTimeout(timeout);
+      }
     } catch {
       return false;
     }
   }
 
   private async startLocalServer(configuredBaseUrl: string): Promise<StartResult> {
-    let opencodePath = this.configService.getValue<string>("opencodeGui.opencodePath", "opencode") ?? "opencode";
-    const configDir = (this.configService.getValue<string>("opencodeGui.configDir", "") ?? "").trim();
+    let opencodePath =
+      this.configService.getValue<string>('opencodeGui.opencodePath', 'opencode') ?? 'opencode';
+    const configDir = (
+      this.configService.getValue<string>('opencodeGui.configDir', '') ?? ''
+    ).trim();
 
     const url = new URL(configuredBaseUrl);
-    const hostname = url.hostname || "127.0.0.1";
+    const hostname = url.hostname || '127.0.0.1';
     const bindHost = this.normalizeLocalHostname(hostname);
 
     const parsedPort = Number(url.port || 4096);
     const requestedPort = Number.isFinite(parsedPort) ? Math.trunc(parsedPort) : 4096;
     const initialPort =
-      requestedPort <= 0 ? await this.getFreePort(bindHost) : await this.ensurePortAvailable(bindHost, requestedPort);
+      requestedPort <= 0
+        ? await this.getFreePort(bindHost)
+        : await this.ensurePortAvailable(bindHost, requestedPort);
 
     const env: NodeJS.ProcessEnv = { ...process.env };
     if (configDir) {
       env.OPENCODE_CONFIG_DIR = configDir;
     }
-    // 给用户一个最小可追踪的标记，便于区分 extension 启动的进程
-    env.OPENCODE_IDE = "vscode";
+    env.OPENCODE_IDE = 'vscode';
 
     const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
 
-    // 在 Windows 上处理不同类型的可执行文件
     let spawnCommand = opencodePath;
     let spawnArgs: string[] = [];
 
     if (process.platform === 'win32') {
       const lowerPath = opencodePath.toLowerCase();
-      
-      // 如果是 .cmd 或 .bat 文件，使用 cmd.exe 来执行
+
       if (lowerPath.endsWith('.cmd') || lowerPath.endsWith('.bat')) {
         this.logService.info(`[OpencodeServerService] Detected batch file: ${opencodePath}`);
-        spawnCommand = "cmd.exe";
-        spawnArgs = ["/c", opencodePath];
-      }
-      // 如果是 .ps1 文件，使用 powershell.exe 来执行
-      else if (lowerPath.endsWith('.ps1')) {
+        spawnCommand = 'cmd.exe';
+        spawnArgs = ['/c', opencodePath];
+      } else if (lowerPath.endsWith('.ps1')) {
         this.logService.info(`[OpencodeServerService] Detected PowerShell script: ${opencodePath}`);
-        spawnCommand = "powershell.exe";
-        spawnArgs = ["-ExecutionPolicy", "Bypass", "-File", opencodePath];
-      }
-      // 对于其他情况，确保有正确的 .exe 扩展名
-      else {
+        spawnCommand = 'powershell.exe';
+        spawnArgs = ['-ExecutionPolicy', 'Bypass', '-File', opencodePath];
+      } else {
         if (!path.isAbsolute(opencodePath) && !opencodePath.endsWith('.exe')) {
           opencodePath = `${opencodePath}.exe`;
         } else if (path.isAbsolute(opencodePath) && !lowerPath.endsWith('.exe')) {
@@ -220,7 +284,7 @@ export class OpencodeServerService implements IOpencodeServerService {
               });
             });
           } catch {
-            // 保持原路径
+            // Keep original path
           }
         }
         spawnCommand = opencodePath;
@@ -238,11 +302,11 @@ export class OpencodeServerService implements IOpencodeServerService {
 
       this.logService.info(`[OpencodeServerService] Starting opencode server: ${hostname}:${port}`);
       this.logService.info(`[OpencodeServerService] Using executable: ${spawnCommand}`);
-      
-      // 添加 serve 命令和参数
-      const customArgs = this.configService.getValue<string[]>("opencodeGui.serverCustomArgs", []) ?? [];
-      
-      const serveArgs = ["serve", `--hostname=${hostname}`, `--port=${port}`, ...customArgs];
+
+      const customArgs =
+        this.configService.getValue<string[]>('opencodeGui.serverCustomArgs', []) ?? [];
+
+      const serveArgs = ['serve', `--hostname=${hostname}`, `--port=${port}`, ...customArgs];
       if (spawnArgs.length > 0) {
         spawnArgs = spawnArgs.concat(serveArgs);
         this.logService.info(`[OpencodeServerService] With arguments: ${spawnArgs.join(' ')}`);
@@ -256,33 +320,48 @@ export class OpencodeServerService implements IOpencodeServerService {
       try {
         proc = spawn(spawnCommand, spawnArgs, { env, cwd, windowsHide: true });
       } catch (spawnError) {
-        this.logService.error(`[OpencodeServerService] Failed to spawn process: ${String(spawnError)}`);
+        this.logService.error(
+          `[OpencodeServerService] Failed to spawn process: ${String(spawnError)}`
+        );
         this.logService.error(`[OpencodeServerService] Executable: ${spawnCommand}`);
         this.logService.error(`[OpencodeServerService] Arguments: ${spawnArgs.join(' ')}`);
         this.logService.error(`[OpencodeServerService] Working directory: ${cwd}`);
-        
+
         if (process.platform === 'win32') {
           this.logService.error(`[OpencodeServerService] Windows diagnostics:`);
-          this.logService.error(`[OpencodeServerService]   - Is path absolute? ${path.isAbsolute(spawnCommand)}`);
-          this.logService.error(`[OpencodeServerService]   - File extension: ${path.extname(spawnCommand)}`);
-          this.logService.error(`[OpencodeServerService]   - Process platform: ${process.platform}`);
+          this.logService.error(
+            `[OpencodeServerService]   - Is path absolute? ${path.isAbsolute(spawnCommand)}`
+          );
+          this.logService.error(
+            `[OpencodeServerService]   - File extension: ${path.extname(spawnCommand)}`
+          );
+          this.logService.error(
+            `[OpencodeServerService]   - Process platform: ${process.platform}`
+          );
         }
-        
-        throw new Error(`Failed to start OpenCode server: ${String(spawnError)}. Please verify the opencode path is correct.`);
-      }
-      
-      this.logService.info(`[OpencodeServerService] Spawned process pid=${proc.pid ?? "unknown"}`);
 
-      // 将 opencode stdout/stderr 重定向到 VSCode Output 面板
+        throw new Error(
+          `Failed to start OpenCode server: ${String(spawnError)}. Please verify the opencode path is correct.`
+        );
+      }
+
+      this.logService.info(`[OpencodeServerService] Spawned process pid=${proc.pid ?? 'unknown'}`);
+
       proc.stdout.on('data', (data: Buffer) => {
-        const lines = data.toString().split('\n').filter((l: string) => l.trim());
+        const lines = data
+          .toString()
+          .split('\n')
+          .filter((l: string) => l.trim());
         for (const line of lines) {
           this.logOpenCodeLine(line);
         }
       });
 
       proc.stderr.on('data', (data: Buffer) => {
-        const lines = data.toString().split('\n').filter((l: string) => l.trim());
+        const lines = data
+          .toString()
+          .split('\n')
+          .filter((l: string) => l.trim());
         for (const line of lines) {
           this.logOpenCodeLine(line);
         }
@@ -291,8 +370,7 @@ export class OpencodeServerService implements IOpencodeServerService {
       try {
         const listeningUrl = await this.waitForListeningUrl(proc);
 
-        // 启动后再 health-check 一次，避免"拿到 url 但 server 还没 ready"
-        const ok = await this.waitUntilHealthy(listeningUrl, 5000);
+        const ok = await this.waitUntilHealthy(listeningUrl, 30000);
         if (!ok) {
           try {
             proc.kill();
@@ -327,9 +405,8 @@ export class OpencodeServerService implements IOpencodeServerService {
   }
 
   private normalizeLocalHostname(hostname: string): string {
-    const h = String(hostname ?? "").trim() || "127.0.0.1";
-    // Avoid IPv6 resolution surprises when probing ports.
-    return h === "localhost" ? "127.0.0.1" : h;
+    const h = String(hostname ?? '').trim() || '127.0.0.1';
+    return h === 'localhost' ? '127.0.0.1' : h;
   }
 
   private isAddressInUseError(error: unknown): boolean {
@@ -352,8 +429,8 @@ export class OpencodeServerService implements IOpencodeServerService {
     return new Promise((resolve) => {
       const server = net.createServer();
       server.unref();
-      server.once("error", () => resolve(false));
-      server.once("listening", () => {
+      server.once('error', () => resolve(false));
+      server.once('listening', () => {
         server.close(() => resolve(true));
       });
       try {
@@ -368,36 +445,123 @@ export class OpencodeServerService implements IOpencodeServerService {
     return new Promise((resolve, reject) => {
       const server = net.createServer();
       server.unref();
-      server.once("error", reject);
+      server.once('error', reject);
       server.listen({ host: hostname, port: 0, exclusive: true }, () => {
         const address = server.address();
         server.close(() => {
-          if (typeof address === "object" && address && typeof (address as any).port === "number") {
+          if (typeof address === 'object' && address && typeof (address as any).port === 'number') {
             resolve((address as any).port);
             return;
           }
-          reject(new Error("Failed to allocate a free port"));
+          reject(new Error('Failed to allocate a free port'));
         });
       });
     });
   }
 
-  private waitForListeningUrl(proc: ChildProcessWithoutNullStreams): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error("Timeout waiting for opencode server to start"));
-      }, 10000);
+  private async killProcessOnPort(hostname: string, port: number): Promise<void> {
+    return new Promise((resolve) => {
+      const netstatCmd =
+        process.platform === 'win32' ? `netstat -ano | findstr :${port}` : `lsof -ti:${port}`;
 
-      let output = "";
+      const proc = spawn(
+        process.platform === 'win32' ? 'cmd.exe' : 'sh',
+        process.platform === 'win32' ? ['/c', netstatCmd] : ['-c', netstatCmd],
+        { shell: true, windowsHide: true }
+      );
+
+      let output = '';
+      proc.stdout?.on('data', (data) => {
+        output += data.toString();
+      });
+
+      proc.on('close', () => {
+        const lines = output.split('\n');
+        for (const line of lines) {
+          let pid: string | null = null;
+
+          if (process.platform === 'win32') {
+            if (line.includes('LISTENING')) {
+              const parts = line.trim().split(/\s+/);
+              pid = parts[parts.length - 1];
+            }
+          } else {
+            const match = line.match(/^(\d+)/);
+            if (match) pid = match[1];
+          }
+
+          if (pid && /\d+/.test(pid)) {
+            this.logService.info(
+              `[OpencodeServerService] Found process ${pid} on port ${port}, killing...`
+            );
+
+            const killCmd =
+              process.platform === 'win32' ? `taskkill /PID ${pid} /T /F` : `kill -9 ${pid}`;
+
+            spawn(
+              process.platform === 'win32' ? 'cmd.exe' : 'sh',
+              process.platform === 'win32' ? ['/c', killCmd] : ['-c', killCmd],
+              { shell: true, windowsHide: true }
+            ).on('close', () => {
+              this.logService.info(`[OpencodeServerService] Killed process ${pid} on port ${port}`);
+              resolve();
+            });
+            return;
+          }
+        }
+
+        this.logService.warn(`[OpencodeServerService] Could not find process on port ${port}`);
+        resolve();
+      });
+
+      proc.on('error', () => {
+        this.logService.warn(`[OpencodeServerService] Failed to find process on port ${port}`);
+        resolve();
+      });
+    });
+  }
+
+  private waitForListeningUrl(proc: ChildProcessWithoutNullStreams): Promise<string> {
+    const maxTotalTimeout = 5 * 60 * 1000;
+    const stallTimeoutMs = 30 * 1000;
+
+    let stallTimer: ReturnType<typeof setTimeout> | undefined;
+    let totalTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const clearTimers = () => {
+      if (stallTimer) clearTimeout(stallTimer);
+      if (totalTimer) clearTimeout(totalTimer);
+    };
+
+    return new Promise((resolve, reject) => {
+      totalTimer = setTimeout(() => {
+        clearTimers();
+        cleanup();
+        reject(new Error('Timeout waiting for opencode server to start (max 5 minutes reached)'));
+      }, maxTotalTimeout);
+
+      const resetStallTimer = () => {
+        if (stallTimer) clearTimeout(stallTimer);
+        stallTimer = setTimeout(() => {
+          clearTimers();
+          cleanup();
+          reject(new Error('Timeout waiting for opencode server to start (no log output for 30s)'));
+        }, stallTimeoutMs);
+      };
+
+      resetStallTimer();
+
+      let output = '';
       const onData = (chunk: unknown) => {
+        resetStallTimer();
+
         output += String(chunk);
         const lines = output.split(/\r?\n/);
         for (const line of lines) {
-          // 来自官方 SDK：`opencode server listening on http://...`
-          if (line.startsWith("opencode server listening")) {
+          if (line.startsWith('opencode server listening')) {
             const match = line.match(/on\s+(https?:\/\/[^\s]+)/);
             if (match?.[1]) {
-              clearTimeout(timeout);
+              clearTimers();
               cleanup();
               resolve(match[1]);
               return;
@@ -407,28 +571,28 @@ export class OpencodeServerService implements IOpencodeServerService {
       };
 
       const onExit = (code: number | null) => {
-        clearTimeout(timeout);
+        clearTimers();
         cleanup();
         reject(new Error(`opencode server exited with code ${code}\n${output}`));
       };
 
       const onError = (error: Error) => {
-        clearTimeout(timeout);
+        clearTimers();
         cleanup();
         reject(error);
       };
 
       const cleanup = () => {
-        proc.stdout?.off("data", onData);
-        proc.stderr?.off("data", onData);
-        proc.off("exit", onExit);
-        proc.off("error", onError);
+        proc.stdout?.off('data', onData);
+        proc.stderr?.off('data', onData);
+        proc.off('exit', onExit);
+        proc.off('error', onError);
       };
 
-      proc.stdout?.on("data", onData);
-      proc.stderr?.on("data", onData);
-      proc.on("exit", onExit);
-      proc.on("error", onError);
+      proc.stdout?.on('data', onData);
+      proc.stderr?.on('data', onData);
+      proc.on('exit', onExit);
+      proc.on('error', onError);
     });
   }
 
@@ -444,24 +608,22 @@ export class OpencodeServerService implements IOpencodeServerService {
   }
 
   private logOpenCodeLine(line: string): void {
-    // 格式: LEVEL timestamp +Xms message
-    // 示例: INFO  2026-02-26T07:13:06 +51ms service=plugin
-    
     let level = 'INFO ';
     let message = line;
-    
-    // 提取级别 (前5个字符, 如 INFO , WARN , ERROR)
+
     if (line.length >= 5) {
       const potentialLevel = line.substring(0, 5).toUpperCase();
-      if (potentialLevel.startsWith('INFO') || potentialLevel.startsWith('WARN') || 
-          potentialLevel.startsWith('ERRO') || potentialLevel.startsWith('DEBUG') || 
-          potentialLevel.startsWith('TRACE')) {
+      if (
+        potentialLevel.startsWith('INFO') ||
+        potentialLevel.startsWith('WARN') ||
+        potentialLevel.startsWith('ERRO') ||
+        potentialLevel.startsWith('DEBUG') ||
+        potentialLevel.startsWith('TRACE')
+      ) {
         level = potentialLevel.padEnd(5, ' ');
-        
-        // 查找 +Xms 位置 (相对时间开始)
+
         const plusIndex = line.indexOf('+');
         if (plusIndex > 0) {
-          // 提取 +Xms 及其后的消息
           message = line.substring(plusIndex);
         }
       }
