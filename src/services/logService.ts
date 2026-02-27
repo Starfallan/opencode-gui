@@ -30,7 +30,7 @@ export interface ILogService {
 export class LogService implements ILogService {
   readonly _serviceBrand: undefined;
 
-	private level: LogLevel = LogLevel.Warning;  // 生产模式：仅显示警告和错误
+	private level: LogLevel = LogLevel.Debug;  // 生产模式：仅显示警告和错误
   private outputChannel: vscode.OutputChannel;
 
   constructor() {
