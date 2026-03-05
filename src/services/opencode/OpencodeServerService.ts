@@ -129,6 +129,8 @@ export class OpencodeServerService implements IOpencodeServerService {
         `[OpencodeServerService] Port ${port} is in use, checking for existing OpenCode server...`
       );
 
+      let shouldStartDedicatedManagedServer = false;
+
       // Try to connect to existing server
       if (await this.checkHealth(configuredBaseUrl, 5000)) {
         const proxyUrl = this.getConfiguredProxyUrl();
@@ -136,23 +138,9 @@ export class OpencodeServerService implements IOpencodeServerService {
 
         if (shouldRestartForProxy) {
           this.logService.info(
-            '[OpencodeServerService] Existing server detected, but proxy is configured; restarting local server to apply proxy env'
+            '[OpencodeServerService] Existing server detected and proxy is configured; starting a dedicated managed server to apply proxy env'
           );
-          await this.killProcessOnPort(host, port);
-
-          const stillHealthy = await this.checkHealth(configuredBaseUrl, 3000);
-          if (!stillHealthy) {
-            this.logService.info(
-              '[OpencodeServerService] Existing server stopped; proceeding with managed restart'
-            );
-          } else {
-            this.logService.warn(
-              '[OpencodeServerService] Existing server is still alive after restart attempt; reusing current server'
-            );
-            this.baseUrl = configuredBaseUrl;
-            this.activeConfigFingerprint = configFingerprint;
-            return configuredBaseUrl;
-          }
+          shouldStartDedicatedManagedServer = true;
         } else {
           this.logService.info(
             `[OpencodeServerService] Reusing existing OpenCode server: ${configuredBaseUrl}`
@@ -163,40 +151,42 @@ export class OpencodeServerService implements IOpencodeServerService {
         }
       }
 
-      // Port is occupied but not responding - show non-modal notification
-      const choice = await vscode.window.showWarningMessage(
-        `端口 ${port} 已被占用，可能是之前的 OpenCode 进程未正常关闭。`,
-        {
-          detail:
-            '请选择操作:\n\n1. 强制杀死进程并重启（推荐）\n2. 等待并重连（如果进程正在启动中）'
-        },
-        '强制杀死并重启',
-        '等待并重连'
-      );
+      if (!shouldStartDedicatedManagedServer) {
+        // Port is occupied but not responding - show non-modal notification
+        const choice = await vscode.window.showWarningMessage(
+          `端口 ${port} 已被占用，可能是之前的 OpenCode 进程未正常关闭。`,
+          {
+            detail:
+              '请选择操作:\n\n1. 强制杀死进程并重启（推荐）\n2. 等待并重连（如果进程正在启动中）'
+          },
+          '强制杀死并重启',
+          '等待并重连'
+        );
 
-      if (choice === '强制杀死并重启') {
-        await this.killProcessOnPort(host, port);
-        this.logService.info(
-          `[OpencodeServerService] Killed process on port ${port}, proceeding with fresh start`
-        );
-      } else {
-        this.logService.info(
-          `[OpencodeServerService] Waiting for existing server to become ready...`
-        );
-        const waitOk = await this.waitUntilHealthy(configuredBaseUrl, 60000);
-        if (waitOk) {
+        if (choice === '强制杀死并重启') {
+          await this.killProcessOnPort(host, port);
           this.logService.info(
-            `[OpencodeServerService] Existing server became ready: ${configuredBaseUrl}`
+            `[OpencodeServerService] Killed process on port ${port}, proceeding with fresh start`
           );
-          this.baseUrl = configuredBaseUrl;
-          this.activeConfigFingerprint = configFingerprint;
-          return configuredBaseUrl;
-        }
+        } else {
+          this.logService.info(
+            `[OpencodeServerService] Waiting for existing server to become ready...`
+          );
+          const waitOk = await this.waitUntilHealthy(configuredBaseUrl, 60000);
+          if (waitOk) {
+            this.logService.info(
+              `[OpencodeServerService] Existing server became ready: ${configuredBaseUrl}`
+            );
+            this.baseUrl = configuredBaseUrl;
+            this.activeConfigFingerprint = configFingerprint;
+            return configuredBaseUrl;
+          }
 
-        this.logService.warn(
-          `[OpencodeServerService] Existing server still not responding, killing and restarting...`
-        );
-        await this.killProcessOnPort(host, port);
+          this.logService.warn(
+            `[OpencodeServerService] Existing server still not responding, killing and restarting...`
+          );
+          await this.killProcessOnPort(host, port);
+        }
       }
     }
 
