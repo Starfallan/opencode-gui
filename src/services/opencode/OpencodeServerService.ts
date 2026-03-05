@@ -131,12 +131,36 @@ export class OpencodeServerService implements IOpencodeServerService {
 
       // Try to connect to existing server
       if (await this.checkHealth(configuredBaseUrl, 5000)) {
-        this.logService.info(
-          `[OpencodeServerService] Reusing existing OpenCode server: ${configuredBaseUrl}`
-        );
-        this.baseUrl = configuredBaseUrl;
-        this.activeConfigFingerprint = configFingerprint;
-        return configuredBaseUrl;
+        const proxyUrl = this.getConfiguredProxyUrl();
+        const shouldRestartForProxy = Boolean(proxyUrl) && !this.proc;
+
+        if (shouldRestartForProxy) {
+          this.logService.info(
+            '[OpencodeServerService] Existing server detected, but proxy is configured; restarting local server to apply proxy env'
+          );
+          await this.killProcessOnPort(host, port);
+
+          const stillHealthy = await this.checkHealth(configuredBaseUrl, 3000);
+          if (!stillHealthy) {
+            this.logService.info(
+              '[OpencodeServerService] Existing server stopped; proceeding with managed restart'
+            );
+          } else {
+            this.logService.warn(
+              '[OpencodeServerService] Existing server is still alive after restart attempt; reusing current server'
+            );
+            this.baseUrl = configuredBaseUrl;
+            this.activeConfigFingerprint = configFingerprint;
+            return configuredBaseUrl;
+          }
+        } else {
+          this.logService.info(
+            `[OpencodeServerService] Reusing existing OpenCode server: ${configuredBaseUrl}`
+          );
+          this.baseUrl = configuredBaseUrl;
+          this.activeConfigFingerprint = configFingerprint;
+          return configuredBaseUrl;
+        }
       }
 
       // Port is occupied but not responding - show non-modal notification
