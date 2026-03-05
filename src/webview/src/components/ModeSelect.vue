@@ -1,7 +1,7 @@
 <template>
-  <DropdownTrigger align="left" :close-on-click-outside="true">
+  <DropdownTrigger align="center" :close-on-click-outside="true">
     <template #trigger>
-      <div class="mode-dropdown">
+      <div class="mode-dropdown" :title="currentModeConfig.label">
         <div class="dropdown-content">
           <i :class="`codicon ${currentModeConfig.icon}`" class="mode-icon" />
           <div class="dropdown-text">
@@ -125,26 +125,35 @@ const currentModeConfig = computed(() => {
 function handlePrimaryAgentSelect(mode: string, close: () => void) {
   const conn = runtime?.connectionManager?.connection() as unknown as Connection | undefined;
   conn?.debugLog?.('debug', `=== ModeSelect START === mode=${mode}`);
-  
+
   let modelValue: string | undefined;
   try {
     modelValue = getAgentModelValue(mode);
-    conn?.debugLog?.('debug', `=== modelValue=${JSON.stringify(modelValue)}, agents=${JSON.stringify(agents.value.map(a => ({id: a.id, name: a.name})))}`);
+    conn?.debugLog?.(
+      'debug',
+      `=== modelValue=${JSON.stringify(modelValue)}, agents=${JSON.stringify(agents.value.map((a) => ({ id: a.id, name: a.name })))}`
+    );
   } catch (e: any) {
     conn?.debugLog?.('error', `=== getAgentModelValue ERROR: ${e?.message || e}`);
   }
-  
+
   close();
-  conn?.debugLog?.('debug', `=== EMITTING primary-agent-select mode=${mode} modelValue=${JSON.stringify(modelValue)}`);
+  conn?.debugLog?.(
+    'debug',
+    `=== EMITTING primary-agent-select mode=${mode} modelValue=${JSON.stringify(modelValue)}`
+  );
   emit('primary-agent-select', mode, modelValue);
 }
 onMounted(async () => {
   // Debug: log initialization state
   if (runtime?.connectionManager) {
     const conn = runtime.connectionManager.connection() as unknown as Connection;
-    conn.debugLog?.('debug', `ModeSelect onMounted: agentsInitialized=${agentsInitialized.value}, hasConnection=${!!conn}`);
+    conn.debugLog?.(
+      'debug',
+      `ModeSelect onMounted: agentsInitialized=${agentsInitialized.value}, hasConnection=${!!conn}`
+    );
   }
-  
+
   if (!runtime?.connectionManager || agentsInitialized.value) return;
 
   const conn = runtime.connectionManager.connection() as unknown as Connection;
@@ -218,7 +227,7 @@ onMounted(async () => {
 
 .dropdown-label {
   opacity: 0.8;
-  max-width: 120px;
+  max-width: 180px;
   overflow: hidden;
   height: 13px;
   text-overflow: ellipsis;
@@ -238,5 +247,25 @@ onMounted(async () => {
   margin: 6px 4px;
   background: var(--vscode-editorGroup-border);
   opacity: 0.6;
+}
+
+:deep(.dropdown-trigger-container) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 560px) {
+  .mode-dropdown {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+
+  .mode-dropdown .dropdown-text {
+    display: none;
+  }
+
+  .mode-dropdown .chevron-icon {
+    display: none;
+  }
 }
 </style>

@@ -2,7 +2,7 @@
   "name": "opencode-gui-vscode",
   "displayName": "OpenCode GUI",
   "description": "在 VSCode 中使用 OpenCode 的图形界面（WebView），自动拉起本地 opencode server。",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "publisher": "Ai365vip",
   "repository": {
     "type": "git",
@@ -49,6 +49,11 @@
           "type": "string",
           "default": "",
           "description": "Optional OPENCODE_CONFIG_DIR override (useful for oh-my-opencode profiles)"
+        },
+        "opencodeGui.proxyUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Proxy URL for OpenCode backend requests (applies to both HTTP_PROXY and HTTPS_PROXY). In some network environments, set this to access OpenAI models via local proxy (e.g. http://127.0.0.1:7897)."
         },
         "opencodeGui.runningWatchdogMs": {
           "type": "number",

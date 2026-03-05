@@ -9,6 +9,10 @@
     />
     <OpenCodeIcon v-else class="empty-mascot" />
     <p class="empty-state-message">{{ currentTip }}</p>
+    <p v-if="showStartupHint" class="startup-wait-message">
+      <span class="codicon codicon-sync codicon-modifier-spin startup-wait-icon"></span>
+      正在启动 OpenCode 服务，请稍候...
+    </p>
   </div>
 </template>
 
@@ -30,6 +34,8 @@ if (!runtime) {
 }
 
 const assetUris = useSignal(runtime.appContext.assetUris);
+const connectionState = useSignal(runtime.connectionManager.state);
+const showStartupHint = computed(() => connectionState.value !== 'connected');
 
 const opencodeLogoSrc = computed(() => {
   const assets = assetUris.value;
@@ -39,7 +45,8 @@ const opencodeLogoSrc = computed(() => {
 
   const root = document.documentElement;
   const isLight =
-    root.classList.contains('vscode-light') || root.classList.contains('vscode-high-contrast-light');
+    root.classList.contains('vscode-light') ||
+    root.classList.contains('vscode-high-contrast-light');
   return isLight ? logo.light : logo.dark;
 });
 
@@ -94,5 +101,24 @@ onMounted(() => {
   text-align: center;
   white-space: pre-line;
   max-width: 400px;
+}
+
+.startup-wait-message {
+  margin: 0;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--vscode-focusBorder) 45%, transparent);
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--vscode-descriptionForeground);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: color-mix(in srgb, var(--vscode-editorInfo-background) 20%, transparent);
+}
+
+.startup-wait-icon {
+  font-size: 11px;
+  opacity: 0.8;
 }
 </style>

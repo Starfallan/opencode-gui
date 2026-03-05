@@ -47,6 +47,7 @@ const pageAnimation = ref({ opacity: 1, x: 0 });
 
 // 初始化运行时（通信与状态逻辑）
 const runtime = useRuntime();
+
 onMounted(() => {
   console.log('[App] runtime initialized', runtime);
 });

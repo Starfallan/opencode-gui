@@ -199,7 +199,12 @@ export class OpencodeServerService implements IOpencodeServerService {
     const configDir = String(
       this.configService.getValue<string>('opencodeGui.configDir', '') ?? ''
     ).trim();
-    return JSON.stringify({ baseUrl, opencodePath, configDir });
+    const proxyUrl = this.getConfiguredProxyUrl();
+    return JSON.stringify({ baseUrl, opencodePath, configDir, proxyUrl });
+  }
+
+  private getConfiguredProxyUrl(): string {
+    return String(this.configService.getValue<string>('opencodeGui.proxyUrl', '') ?? '').trim();
   }
 
   private isLocalBaseUrl(baseUrl: string): boolean {
@@ -254,6 +259,7 @@ export class OpencodeServerService implements IOpencodeServerService {
     if (configDir) {
       env.OPENCODE_CONFIG_DIR = configDir;
     }
+    this.applyProxyEnv(env);
     env.OPENCODE_IDE = 'vscode';
 
     const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
@@ -407,6 +413,26 @@ export class OpencodeServerService implements IOpencodeServerService {
   private normalizeLocalHostname(hostname: string): string {
     const h = String(hostname ?? '').trim() || '127.0.0.1';
     return h === 'localhost' ? '127.0.0.1' : h;
+  }
+
+  private applyProxyEnv(env: NodeJS.ProcessEnv): void {
+    const proxyUrl = this.getConfiguredProxyUrl();
+    if (!proxyUrl) {
+      return;
+    }
+
+    env.HTTP_PROXY = proxyUrl;
+    env.HTTPS_PROXY = proxyUrl;
+    env.ALL_PROXY = proxyUrl;
+    env.http_proxy = proxyUrl;
+    env.https_proxy = proxyUrl;
+    env.all_proxy = proxyUrl;
+
+    if (!env.NODE_USE_ENV_PROXY) {
+      env.NODE_USE_ENV_PROXY = '1';
+    }
+
+    this.logService.info('[OpencodeServerService] Proxy env injected for OpenCode server process');
   }
 
   private isAddressInUseError(error: unknown): boolean {

@@ -58,6 +58,7 @@ OpenCode install instructions: https://opencode.ai/docs
 - `opencodeGui.selectedModel`: default model (`provider/model`)
 - `opencodeGui.selectedAgent`: default agent name
 - `opencodeGui.configDir`: pass `OPENCODE_CONFIG_DIR` when starting the server (useful for oh-my-opencode profiles)
+- `opencodeGui.proxyUrl`: proxy URL injected into OpenCode server process (`HTTP_PROXY` + `HTTPS_PROXY`) for environments that require local/system proxy to access OpenAI
 - `opencodeGui.runningWatchdogMs`: abort a running session if no SSE events are received for this long (ms). Set to `0` to disable.
 - `opencodeGui.serverIdleShutdownMs`: stop the local server (only if auto-started by this extension) after all channels are closed and idle for this long (ms). Set to `0` to disable.
 

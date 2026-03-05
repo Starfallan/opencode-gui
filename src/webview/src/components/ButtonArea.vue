@@ -4,19 +4,23 @@
       <!-- Left Section: Dropdowns -->
       <div v-if="!hideModelControls" class="controls-section">
         <!-- Mode Select -->
-        <ModeSelect
-          :primary-agent-mode="primaryAgentMode"
-          :selected-agent="selectedAgent"
-          @primary-agent-select="
-            (mode, modelValue) => emit('primary-agent-select', mode, modelValue)
-          "
-        />
+        <div class="mode-select-slot">
+          <ModeSelect
+            :primary-agent-mode="primaryAgentMode"
+            :selected-agent="selectedAgent"
+            @primary-agent-select="
+              (mode, modelValue) => emit('primary-agent-select', mode, modelValue)
+            "
+          />
+        </div>
 
         <!-- Model Select -->
-        <ModelSelect
-          :selected-model="selectedModel"
-          @model-select="(modelId) => emit('model-select', modelId)"
-        />
+        <div class="model-select-slot">
+          <ModelSelect
+            :selected-model="selectedModel"
+            @model-select="(modelId) => emit('model-select', modelId)"
+          />
+        </div>
 
         <!-- Variant Select -->
         <DropdownTrigger
@@ -350,14 +354,14 @@ function handleCommandKeydown(event: KeyboardEvent) {
 }
 
 .button-row {
-  display: grid;
-  grid-template-columns: 4fr 1fr;
+  display: flex;
   align-items: center;
+  gap: 6px;
   height: 28px;
   padding-right: 2px;
   box-sizing: border-box;
   flex: 1 1 0%;
-  justify-content: space-between;
+  min-width: 0;
   width: 100%;
 }
 
@@ -366,11 +370,10 @@ function handleCommandKeydown(event: KeyboardEvent) {
   align-items: center;
   gap: 4px;
   margin-right: 6px;
-  flex-shrink: 1;
-  flex-grow: 0;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 24px;
-  max-width: 100%;
+  overflow: hidden;
 }
 
 .actions-section {
@@ -378,6 +381,29 @@ function handleCommandKeydown(event: KeyboardEvent) {
   align-items: center;
   gap: 4px;
   justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.model-select-slot {
+  flex: 1 1 96px;
+  min-width: 0;
+  max-width: 170px;
+  overflow: hidden;
+}
+
+.mode-select-slot {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 220px;
+  overflow: hidden;
+}
+
+@media (max-width: 560px) {
+  .mode-select-slot {
+    flex: 0 0 22px;
+    min-width: 22px;
+    max-width: 22px;
+  }
 }
 
 .actions-section.full-width {

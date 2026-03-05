@@ -1,10 +1,7 @@
 <template>
-  <DropdownTrigger
-    align="center"
-    :close-on-click-outside="true"
-  >
+  <DropdownTrigger class="model-select-trigger" align="center" :close-on-click-outside="true">
     <template #trigger>
-      <div class="model-dropdown">
+      <div class="model-dropdown" :title="selectedModelLabel">
         <div class="dropdown-content">
           <div class="dropdown-text">
             <span class="dropdown-label">{{ selectedModelLabel }}</span>
@@ -40,7 +37,12 @@
           type: 'action'
         }"
         :index="enabledModels.length"
-        @click="() => { showManagementDialog = true; close() }"
+        @click="
+          () => {
+            showManagementDialog = true;
+            close();
+          }
+        "
       >
         <template #icon>
           <i class="codicon codicon-settings-gear" />
@@ -59,64 +61,64 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { DropdownTrigger, DropdownItem } from './Dropdown'
-import ModelManagementDialog from './ModelManagementDialog.vue'
-import { useModelManagement } from '../composables/useModelManagement'
+import { computed, ref } from 'vue';
+import { DropdownTrigger, DropdownItem } from './Dropdown';
+import ModelManagementDialog from './ModelManagementDialog.vue';
+import { useModelManagement } from '../composables/useModelManagement';
 
 interface Props {
-  selectedModel?: string  // 从 session.modelSelection 传入
+  selectedModel?: string; // 从 session.modelSelection 传入
 }
 
 interface Emits {
-  (e: 'model-select', modelId: string): void
+  (e: 'model-select', modelId: string): void;
 }
 
-const props = defineProps<Props>()
-const emit = defineEmits<Emits>()
+const props = defineProps<Props>();
+const emit = defineEmits<Emits>();
 
 // 使用模型管理（获取模型列表）
-const { availableModels } = useModelManagement()
+const { availableModels } = useModelManagement();
 
 // 模型管理对话框显示状态
-const showManagementDialog = ref(false)
+const showManagementDialog = ref(false);
 
 // 当前选中的模型：优先使用 props，其次使用 useModelManagement
 const currentSelectedModel = computed(() => {
-  return props.selectedModel || availableModels.value[0]?.value || ''
-})
+  return props.selectedModel || availableModels.value[0]?.value || '';
+});
 
 // 只显示启用的模型
 const enabledModels = computed(() => {
-  return availableModels.value.filter(m => !m.disabled)
-})
+  return availableModels.value.filter((m) => !m.disabled);
+});
 
 // 计算显示的模型名称
 const selectedModelLabel = computed(() => {
-  const current = availableModels.value.find(m => m.value === currentSelectedModel.value)
-  return current?.label || '选择模型'
-})
+  const current = availableModels.value.find((m) => m.value === currentSelectedModel.value);
+  return current?.label || '选择模型';
+});
 
 function handleModelSelect(modelValue: string, close: () => void) {
-  console.log('[ModelSelect] 选择模型:', modelValue)
-  close()
+  console.log('[ModelSelect] 选择模型:', modelValue);
+  close();
 
   // 发送模型切换事件（通知后端）
-  emit('model-select', modelValue)
+  emit('model-select', modelValue);
 }
 
 function handleDialogModelSelect(modelValue: string) {
-  showManagementDialog.value = false
-  emit('model-select', modelValue)
+  showManagementDialog.value = false;
+  emit('model-select', modelValue);
 }
-
 </script>
 
 <style scoped>
 /* Model 下拉样式 - 简洁透明样式 */
 .model-dropdown {
-  display: flex;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 1px;
   font-size: 12px;
   align-items: center;
   line-height: 24px;
@@ -161,8 +163,9 @@ function handleDialogModelSelect(modelValue: string) {
 }
 
 .dropdown-label {
+  display: block;
   opacity: 0.8;
-  max-width: 200px;
+  max-width: 100%;
   overflow: hidden;
   height: 13px;
   text-overflow: ellipsis;
@@ -173,6 +176,7 @@ function handleDialogModelSelect(modelValue: string) {
 .chevron-icon {
   font-size: 9px;
   flex-shrink: 0;
+  margin-left: -1px;
   opacity: 0.5;
   color: var(--vscode-foreground);
 }
@@ -181,5 +185,25 @@ function handleDialogModelSelect(modelValue: string) {
   height: 1px;
   background-color: var(--vscode-menu-separatorBackground);
   margin: 4px 0;
+}
+
+:deep(.model-select-trigger) {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+:deep(.model-select-trigger .dropdown-trigger-container) {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+:deep(.model-select-trigger .dropdown-trigger-container > div) {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
 }
 </style>

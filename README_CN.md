@@ -64,6 +64,7 @@ OpenCode 安装文档：https://opencode.ai/docs
 - `opencodeGui.selectedModel`：默认模型（`provider/model`）
 - `opencodeGui.selectedAgent`：默认 agent 名称
 - `opencodeGui.configDir`：启动 server 时传入 `OPENCODE_CONFIG_DIR`（适合 oh-my-opencode profile/隔离）
+- `opencodeGui.proxyUrl`：为扩展拉起的 OpenCode server 注入代理地址（同时设置 `HTTP_PROXY` 与 `HTTPS_PROXY`），适用于需要系统/本地代理访问 OpenAI 的环境
 - `opencodeGui.runningWatchdogMs`：会话运行中若连续这么久（毫秒）未收到 SSE 事件则自动中断（防止卡死）；设为 `0` 可关闭。
 - `opencodeGui.serverIdleShutdownMs`：当所有会话标签页都关闭后，空闲这么久（毫秒）自动停止本地 server；设为 `0` 可关闭。
 
